@@ -9,7 +9,18 @@
 import studentInfo
 import signUtils
 
-location_options = {"3号教学楼" : [3,3], "4号教学楼" : [4,4], "5号教学楼" : [5,5], "实验楼" : [6,6], "一田" : [1,1], "二田" : [2,2]}
+location_options = {
+    "3号教学楼" : ["110.32580068426542","20.05833084181918"]
+    ,"4号教学楼" : ["110.32724389990553","20.05901300751073"]
+    ,"5号教学楼" : ["110.3282317985653","20.062391497296275"]
+    ,"6号教学楼": ["110.32937867587619","20.060006239101234"]
+    ,"7号教学楼": ["110.32936868059865","20.06052579127188"]
+    ,"9号教学楼": ["110.33123279466301","20.06002974783358"]
+    ,"10号教学楼": ["110.33126289729519","20.060719236083752"]
+    ,"实验楼" : ["110.33046102616181","20.05899912939425"]
+    ,"一田" : ["110.3291079996823","20.05853693768231"]
+    ,"二田" : ["110.32433736519832","20.056229821403946"]
+}
 
 pl_getXsQdInfo = {
     "sign": "",
@@ -133,16 +144,29 @@ def process_GetGpsWzJl(qdId,location):
     payload["sign"] = sign[0]
     return payload
 
-def process_SaveXsQdInfo(raw_data):
+def process_SaveXsQdInfo(qdKcInfo, code, location):
     payload = pl_saveXsQdInfo
-    for i in raw_data:
+    for i in qdKcInfo:
         for o in payload:
             if o == i:
-                payload[o] = raw_data[i]
+                payload[o] = qdKcInfo[i]
                 break
     for i in stuInfo:
         for o in payload:
             if o == i:
                 payload[o] = stuInfo[i]
                 break
+
+    payload["jsXm"] = qdKcInfo["skJs"]
+    payload["kl"] = code
+    payload["wzJd"] = location_options[location][0]
+    payload["wzWd"] = location_options[location][1]
+    payload["fzMC"] = "全部"
+    payload["isFace"] = "undefined"
+    payload["isFz"] = "undefined"
+    payload["wzAcc"] = "5"
+    payload["wtDa"] = ""
+    sign = signUtils.getSignAndTimestamp()
+    payload["sign"] = sign[0]
+    payload["timestamp"] = sign[1]
     return payload

@@ -67,7 +67,8 @@
             <label for="location">📍 确认当前上课地点：</label>
             <select name="location" id="location">
                 {% for loc in locations %}
-                <option value="{{ loc }}" {% if loc == course.location %}selected{% endif %}>{{ loc }}</option>
+                <!-- 修改判断条件为 recommend_loc -->
+                <option value="{{ loc }}" {% if loc == recommend_loc %}selected{% endif %}>{{ loc }}</option>
                 {% endfor %}
             </select>
         </div>

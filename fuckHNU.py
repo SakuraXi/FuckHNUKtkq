@@ -34,8 +34,15 @@ def send_post(apiurl,postpayload):
     except requests.exceptions.RequestException as e:
         print(f"请求发送失败: {e}")
 
-def signWithCode(code,location):
-    pass
+def signWithCode(classId, code, location):
+    pl = payLoadsUtils.process_GetXsQdInfo(qdkblist[classId-1])
+    print("getXsQdInfo", pl)
+
+    pl1 = payLoadsUtils.process_GetGpsWzJl(qdkblist[classId-1]["qdId"],location)
+    print("getGpsWzJl", pl1)
+
+    pl2 = payLoadsUtils.process_SaveXsQdInfo(qdkblist[classId-1],code,location)
+    print("saveXsQdInfo", pl2)
 
 @app.route('/')
 def index():
@@ -50,7 +57,9 @@ def index():
 def signin_page(course_id):
     course = next((item for item in today_schedule if item["id"] == course_id), None)
     if course:
-        return render_template('signin.html', course=course, locations=payLoadsUtils.location_options.keys())
+        reloc = "3号教学楼"
+
+        return render_template('signin.html', course=course, locations=payLoadsUtils.location_options.keys(), recommend_loc=reloc)
     return "课程未找到", 404
 
 
@@ -72,12 +81,13 @@ def do_signin(course_id):
         print(f"签到码内容: {signin_code}")
     print(f"------------------")
 
+    signWithCode(course_id, signin_code, selected_location)
+
+
     # 3. 更新内部变量状态
     for course in today_schedule:
         if course["id"] == course_id:
             course["status"] = "已签到"
-            # 也可以更新地点为用户确认的地点
-            course["location"] = selected_location
             break
 
     return redirect(url_for('index'))
@@ -106,8 +116,6 @@ if __name__ == "__main__":
 
     qdkblist = payLoadsUtils.process_GetQdKbList(send_post("getQdKbList", pl_getQdKbList))
     print(qdkblist[0])
-    # xsqdinfo = payLoadsUtils.process_GetXsQdInfo(qdkblist)
-    # print(xsqdinfo)
 
     today_schedule = [{
         "id" : 0,
@@ -119,27 +127,21 @@ if __name__ == "__main__":
         "teacher": "李老师"
     },]
 
-    # for lec in qdkblist:
-    #     lec_info = {"id": qdkblist.index(lec)+ 1}
-    #     for i in lec:
-    #         if i == "kcMc":
-    #             lec_info["name"] = lec[i]
-    #         elif i == "xsQdQkMc":
-    #             lec_info["status"] = str(lec[i]) + "到"
-    #         elif i == "skDd":
-    #             lec_info["location"] = lec[i]
-    #         elif i == "skSj":
-    #             lec_info["time"] = str(lec[i]).split("(")[1].replace(")","")
-    #             lec_info["period"] = str(lec[i]).split("(")[0]
-    #         elif i == "skJs":
-    #             lec_info["teacher"] = lec[i]
-    #     today_schedule.append(lec_info)
+    for lec in qdkblist:
+        lec_info = {"id": qdkblist.index(lec)+ 1}
+        for i in lec:
+            if i == "kcMc":
+                lec_info["name"] = lec[i]
+            elif i == "xsQdQkMc":
+                # lec_info["status"] = str(lec[i]) + "到"
+                lec_info["status"] = "未签到"
+            elif i == "skDd":
+                lec_info["location"] = lec[i]
+            elif i == "skSj":
+                lec_info["time"] = str(lec[i]).split("(")[1].replace(")","")
+                lec_info["period"] = str(lec[i]).split("(")[0]
+            elif i == "skJs":
+                lec_info["teacher"] = lec[i]
+        today_schedule.append(lec_info)
     print(today_schedule)
-    # app.run(debug=True, port=5000)
-
-    pl = payLoadsUtils.process_GetXsQdInfo(qdkblist[0])
-    print(pl)
-
-    pl1 = payLoadsUtils.process_GetGpsWzJl(qdkblist[0]["qdId"],"3号教学楼")
-    print(pl1)
-    # xsQdInfo = send_post("getXsQdInfo",pl)
+    app.run(debug=True, port=5000)
