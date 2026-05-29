@@ -40,7 +40,6 @@ function verify(msg, sigHex, pubKey) {
     }
 }
 
-// 导出给 execjs 使用（execjs 本质是拼接字符串执行，所以函数需要全局可见）
 global.sign = sign;
 global.decrypt = decrypt;
 global.getPublicKey = getPublicKey;

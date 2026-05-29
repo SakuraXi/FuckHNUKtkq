@@ -3,8 +3,8 @@
 # @Author  : xlxlSakura
 # @FileName: signUtils.py
 # @Software: PyCharm
-# @Description: 
-# @Version: 1.0
+# @Description: 国密SM2签名算法，通过js桥接来调用微信小程序库避免曲率和userID等差异导致签名校验不通过
+# @Version: 0.1
 
 import execjs
 import os
@@ -20,20 +20,13 @@ os.environ["NODE_PATH"] = os.path.join(os.getcwd(), "node_modules")
 def sm2_sign(msg_hex, priv_key_hex):
     with open("sm2_bridge.js", "r", encoding="utf-8") as f:
         js_code = f.read()
-
     ctx = execjs.compile(js_code)
-
-    options = {
-        "hash": True,
-    }
-
     try:
-        signature = ctx.call("sign", msg_hex, priv_key_hex, options)
+        signature = ctx.call("sign", msg_hex, priv_key_hex, {"hash": True,})
         return signature
     except Exception as e:
         print(f"执行出错: {e}")
         return None
-
 
 def sm2_valid(signature, priv_key,testmsg):
     with open("sm2_bridge.js", "r", encoding="utf-8") as f:

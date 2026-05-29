@@ -3,17 +3,36 @@
 # @Author  : xlxlSakura
 # @FileName: fuckHNU.py
 # @Software: PyCharm
-# @Description: Automatically FUCK the attendance system of HNU and CRACK the reg-token violently.
+# @Description: FUCK the signing system of HNU and CRACK the sign-token.
 # @Version: 0.1
 
 import re
-import time
 import requests
 import payLoadsUtils
+import studentInfo #############抓包获得的个人信息
 import signUtils
 from flask import Flask, render_template, redirect, url_for, request
 from datetime import datetime
 import json
+
+"""
+studentInfo内的个人信息格式(抓getUserOpenId这个包里面都有)：
+infos = {
+    "unitCode" : "", 用户码
+    "userCode" : "", 学号
+    "userName": "", 姓名
+    "syMc": "", 书院名
+    "syBjMc": "", 书院班级名
+    "dsZgh": "", 导师号
+    "dsXm": "", 导师姓名
+    "fdyZgh": "", 辅导员号
+    "fdyXm": "", 辅导员姓名
+    "bjMc": "", 学院班级名
+    "zyMc": "", 专业名
+    "xyMc": "", 学院名
+    "xn" : "2025-2026", 学年
+}
+"""
 
 app = Flask(__name__)
 serverUrl = "https://ktkq.hainanu.edu.cn/app"
@@ -35,6 +54,7 @@ def send_post(apiurl,postpayload):
         print(f"请求发送失败: {e}")
 
 def signWithCode(classId, code, location):
+    # TODO 删除-1
     pl = payLoadsUtils.process_GetXsQdInfo(qdkblist[classId-1])
     print("getXsQdInfo", pl)
 
@@ -43,6 +63,9 @@ def signWithCode(classId, code, location):
 
     pl2 = payLoadsUtils.process_SaveXsQdInfo(qdkblist[classId-1],code,location)
     print("saveXsQdInfo", pl2)
+
+def signWithoutCode(classId, location):
+    pass
 
 @app.route('/')
 def index():
@@ -58,7 +81,17 @@ def signin_page(course_id):
     course = next((item for item in today_schedule if item["id"] == course_id), None)
     if course:
         reloc = "3号教学楼"
-
+        match = re.search(r"\)(\d{1,2})\-", today_schedule[course_id]["location"])
+        # print(match,today_schedule[course_id]["location"])
+        if match:
+            reloc = match.group(1) + "号教学楼"
+        elif "实验" in today_schedule[course_id]["location"]:
+            reloc = "实验楼"
+        elif "第一运动" in today_schedule[course_id]["location"]:
+            reloc = "一田"
+        elif "第二运动" in today_schedule[course_id]["location"]:
+            reloc = "二田"
+        print(reloc)
         return render_template('signin.html', course=course, locations=payLoadsUtils.location_options.keys(), recommend_loc=reloc)
     return "课程未找到", 404
 
@@ -73,18 +106,19 @@ def do_signin(course_id):
         if not signin_code or not re.match(r'^\d{4}$', signin_code):
             return "提交失败：签到码格式不正确（必须为4位数字）", 400
 
-    print(f"--- 收到签到请求 ---")
+    print(f"---- 签到请求 ----")
     print(f"课程ID: {course_id}")
     print(f"确认地点: {selected_location}")
     print(f"是否有签到码: {'是' if has_code else '否'}")
     if has_code:
         print(f"签到码内容: {signin_code}")
-    print(f"------------------")
+    print(f"----------------")
 
-    signWithCode(course_id, signin_code, selected_location)
+    if has_code:
+        signWithCode(course_id, signin_code, selected_location)
+    else:
+        signWithoutCode(course_id, selected_location)
 
-
-    # 3. 更新内部变量状态
     for course in today_schedule:
         if course["id"] == course_id:
             course["status"] = "已签到"
@@ -97,34 +131,26 @@ if __name__ == "__main__":
     signUtils.sm2_valid(sign[0], signUtils.privateKey, sign[1])
     print(f"SM2 签名结果: {sign}")
 
-    pl_getQdKbList = {
-        "sign": sign[0],
-        "timestamp": sign[1],
-        "userType": "1",
-        "userCode": "20253002390",
-        "unitCode": "10589",
-        "userName": "刘宸铄",
-        "roleCode": "0",
-        "bm": "null",
-        "xyMc": "环境科学与工程学院",
-        "zy": "环境科学",
-        "bj": "环境科学2025-4",
-        "xsCc": "1",
-        "scene": "1",
-        "key": "1"
-    }
+    qdkblist = payLoadsUtils.process_GetQdKbList(send_post("getQdKbList", studentInfo.getExampleQdKbList(sign[0],sign[1])))
 
-    qdkblist = payLoadsUtils.process_GetQdKbList(send_post("getQdKbList", pl_getQdKbList))
-    print(qdkblist[0])
+    ##########没课时用抓包数据测试
+    # with open("test.json", "r", encoding="utf-8") as f:
+    #     testjson = json.load(f)
+    # print(testjson)
+    # qdkblist = payLoadsUtils.process_GetQdKbList(testjson)
+
+    if len(qdkblist) == 0:
+        print("今日无课！")
+        exit(114514)
 
     today_schedule = [{
         "id" : 0,
         "name": "大学英语",
         "status": "未签到",
-        "location": "(海甸)3-205",
-        "time": "10:00~11:35",
-        "period": "第3,4节",
-        "teacher": "李老师"
+        "location": "(海甸)6-205",
+        "time": "7:40~9:20",
+        "period": "第1,2节",
+        "teacher": "112233"
     },]
 
     for lec in qdkblist:
@@ -133,6 +159,8 @@ if __name__ == "__main__":
             if i == "kcMc":
                 lec_info["name"] = lec[i]
             elif i == "xsQdQkMc":
+                #TODO For Debugging
+
                 # lec_info["status"] = str(lec[i]) + "到"
                 lec_info["status"] = "未签到"
             elif i == "skDd":

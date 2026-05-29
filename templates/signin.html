@@ -59,7 +59,6 @@
         <p><strong>课表地点：</strong>{{ course.location }}</p>
     </div>
 
-    <!-- 1. 增加了 onsubmit 校验函数 -->
     <form id="signinForm" action="{{ url_for('do_signin', course_id=course.id) }}" method="POST" onsubmit="return validateForm()">
 
         <!-- 地点确认选择 -->
@@ -67,7 +66,6 @@
             <label for="location">📍 确认当前上课地点：</label>
             <select name="location" id="location">
                 {% for loc in locations %}
-                <!-- 修改判断条件为 recommend_loc -->
                 <option value="{{ loc }}" {% if loc == recommend_loc %}selected{% endif %}>{{ loc }}</option>
                 {% endfor %}
             </select>
@@ -82,9 +80,7 @@
         <!-- 签到码输入框容器 -->
         <div id="code_input_wrapper">
             <label for="signin_code">验证码：</label>
-            <!-- 2. 增加了 maxlength 限制 -->
             <input type="text" name="signin_code" id="signin_code" maxlength="4" placeholder="请输入4位数字签到码">
-            <!-- 3. 错误提示显示区域 -->
             <div id="error_text" class="error-msg"></div>
         </div>
 
@@ -110,7 +106,7 @@
         }
     }
 
-    // 4. 新增表单校验逻辑
+    // 表单校验
     function validateForm() {
         var hasCode = document.getElementById('has_code').checked;
         var codeInput = document.getElementById('signin_code').value.trim();

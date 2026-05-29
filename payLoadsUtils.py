@@ -156,7 +156,6 @@ def process_SaveXsQdInfo(qdKcInfo, code, location):
             if o == i:
                 payload[o] = stuInfo[i]
                 break
-
     payload["jsXm"] = qdKcInfo["skJs"]
     payload["kl"] = code
     payload["wzJd"] = location_options[location][0]
