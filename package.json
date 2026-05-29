@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "miniprogram-sm-crypto": "^0.4.0"
+  }
+}
