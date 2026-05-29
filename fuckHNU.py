@@ -16,10 +16,7 @@ from datetime import datetime
 import json
 
 app = Flask(__name__)
-privateKey = "00f661332f70969150a8ea126943958a914cc05abc7e3ad3d96570cc4fd01a9ce4"
 serverUrl = "https://ktkq.hainanu.edu.cn/app"
-
-location_options = {"3号教学楼" : "", "4号教学楼" : "", "5号教学楼" : "", "实验楼" : "", "一田" : "", "二田" : ""}
 
 def send_post(apiurl,postpayload):
     headers = {
@@ -37,6 +34,9 @@ def send_post(apiurl,postpayload):
     except requests.exceptions.RequestException as e:
         print(f"请求发送失败: {e}")
 
+def signWithCode(code,location):
+    pass
+
 @app.route('/')
 def index():
     now = datetime.now()
@@ -50,7 +50,7 @@ def index():
 def signin_page(course_id):
     course = next((item for item in today_schedule if item["id"] == course_id), None)
     if course:
-        return render_template('signin.html', course=course, locations=location_options.keys())
+        return render_template('signin.html', course=course, locations=payLoadsUtils.location_options.keys())
     return "课程未找到", 404
 
 
@@ -83,15 +83,13 @@ def do_signin(course_id):
     return redirect(url_for('index'))
 
 if __name__ == "__main__":
-    timestamp = int(time.time() * 1000)
-    sts = str(timestamp)
-    sign = signUtils.sm2_sign(sts, privateKey)
-    signUtils.sm2_valid(sign, privateKey, sts)
+    sign = signUtils.getSignAndTimestamp()
+    signUtils.sm2_valid(sign[0], signUtils.privateKey, sign[1])
     print(f"SM2 签名结果: {sign}")
 
     pl_getQdKbList = {
-        "sign": sign,
-        "timestamp": sts,
+        "sign": sign[0],
+        "timestamp": sign[1],
         "userType": "1",
         "userCode": "20253002390",
         "unitCode": "10589",
@@ -121,20 +119,27 @@ if __name__ == "__main__":
         "teacher": "李老师"
     },]
 
-    for lec in qdkblist:
-        lec_info = {"id": qdkblist.index(lec)+ 1}
-        for i in lec:
-            if i == "kcMc":
-                lec_info["name"] = lec[i]
-            elif i == "xsQdQkMc":
-                lec_info["status"] = str(lec[i]) + "到"
-            elif i == "skDd":
-                lec_info["location"] = lec[i]
-            elif i == "skSj":
-                lec_info["time"] = str(lec[i]).split("(")[1].replace(")","")
-                lec_info["period"] = str(lec[i]).split("(")[0]
-            elif i == "skJs":
-                lec_info["teacher"] = lec[i]
-        today_schedule.append(lec_info)
+    # for lec in qdkblist:
+    #     lec_info = {"id": qdkblist.index(lec)+ 1}
+    #     for i in lec:
+    #         if i == "kcMc":
+    #             lec_info["name"] = lec[i]
+    #         elif i == "xsQdQkMc":
+    #             lec_info["status"] = str(lec[i]) + "到"
+    #         elif i == "skDd":
+    #             lec_info["location"] = lec[i]
+    #         elif i == "skSj":
+    #             lec_info["time"] = str(lec[i]).split("(")[1].replace(")","")
+    #             lec_info["period"] = str(lec[i]).split("(")[0]
+    #         elif i == "skJs":
+    #             lec_info["teacher"] = lec[i]
+    #     today_schedule.append(lec_info)
     print(today_schedule)
-    app.run(debug=True, port=5000)
+    # app.run(debug=True, port=5000)
+
+    pl = payLoadsUtils.process_GetXsQdInfo(qdkblist[0])
+    print(pl)
+
+    pl1 = payLoadsUtils.process_GetGpsWzJl(qdkblist[0]["qdId"],"3号教学楼")
+    print(pl1)
+    # xsQdInfo = send_post("getXsQdInfo",pl)

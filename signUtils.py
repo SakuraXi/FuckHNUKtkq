@@ -10,6 +10,8 @@ import execjs
 import os
 import time
 
+privateKey = "00f661332f70969150a8ea126943958a914cc05abc7e3ad3d96570cc4fd01a9ce4"
+
 os.environ["EXECJS_RUNTIME"] = "Node"
 print(execjs.get().name)
 
@@ -45,3 +47,9 @@ def sm2_valid(signature, priv_key,testmsg):
     test_msg = testmsg
     is_valid = ctx.call("verify", test_msg, signature, pub_key)
     print(f"验签结果: {is_valid}")
+
+def getSignAndTimestamp():
+    timestamp = int(time.time() * 1000)
+    sts = str(timestamp)
+    sign = sm2_sign(sts, privateKey)
+    return [sign, sts]

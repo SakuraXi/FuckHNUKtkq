@@ -7,6 +7,9 @@
 # @Version: 0.1
 
 import studentInfo
+import signUtils
+
+location_options = {"3号教学楼" : [3,3], "4号教学楼" : [4,4], "5号教学楼" : [5,5], "实验楼" : [6,6], "一田" : [1,1], "二田" : [2,2]}
 
 pl_getXsQdInfo = {
     "sign": "",
@@ -49,7 +52,7 @@ pl_getGpsWzJl = {
     "wzJd2": "",
     "wzWd2": "",
     "qdId": "",
-    "type2": ""
+    "type": ""
 }
 pl_saveXsQdInfo = {
     "sign": "",
@@ -92,7 +95,6 @@ stuInfo = studentInfo.infos
 
 def process_GetQdKbList(raw):
     raw_data = raw["Rows"]
-
     return raw_data
 
 def process_GetXsQdInfo(raw_data):
@@ -107,20 +109,28 @@ def process_GetXsQdInfo(raw_data):
             if o == i:
                 payload[o] = stuInfo[i]
                 break
+    payload["fzMC"] = "全部"
+    sign = signUtils.getSignAndTimestamp()
+    payload["sign"] = sign[0]
+    payload["timestamp"] = sign[1]
     return payload
 
-def process_GetGpsWzJl(raw_data):
+def process_GetGpsWzJl(qdId,location):
     payload = pl_getGpsWzJl
-    for i in raw_data:
-        for o in payload:
-            if o == i:
-                payload[o] = raw_data[i]
-                break
     for i in stuInfo:
         for o in payload:
             if o == i:
                 payload[o] = stuInfo[i]
                 break
+    payload["userType"] = "1"
+    payload["type"] = "2"
+    payload["wzJd"] = location_options[location][0]
+    payload["wzWd"] = location_options[location][1]
+    payload["wzJd2"] = "0.0"
+    payload["wzWd2"] = "0.0"
+    payload["qdId"] = qdId
+    sign = signUtils.getSignAndTimestamp()
+    payload["sign"] = sign[0]
     return payload
 
 def process_SaveXsQdInfo(raw_data):
