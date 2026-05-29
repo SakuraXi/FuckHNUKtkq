@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>课程签到</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .signin-box { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; width: 300px; }
+        .course-name { font-size: 24px; color: #333; margin-bottom: 10px; }
+        .info { color: #666; margin-bottom: 20px; }
+        .btn { display: inline-block; background: #52c41a; color: white; padding: 10px 25px; border-radius: 5px; text-decoration: none; font-size: 18px; transition: 0.3s; }
+        .btn:hover { background: #45a018; }
+        .back-link { display: block; margin-top: 15px; color: #999; text-decoration: none; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="signin-box">
+        <div style="font-size: 50px;">📍</div>
+        <div class="course-name">{{ course.name }}</div>
+        <div class="info">
+            地点：{{ course.location }}<br>
+            教师：{{ course.teacher }}<br>
+            时间：{{ course.time }}
+        </div>
+
+        <!-- 点击此按钮会调用 Python 里的 do_signin 函数 -->
+        <a href="{{ url_for('do_signin', course_id=course.id) }}" class="btn">确认签到</a>
+
+        <a href="/" class="back-link">返回课表</a>
+    </div>
+</body>
+</html>

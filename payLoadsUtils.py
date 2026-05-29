@@ -6,6 +6,8 @@
 # @Description: API-Payloads processing utilities.
 # @Version: 0.1
 
+import studentInfo
+
 pl_getXsQdInfo = {
     "sign": "",
     "timestamp": "",
@@ -85,3 +87,52 @@ pl_saveXsQdInfo = {
     "wtDa": "",
     "qdLx": ""
 }
+
+stuInfo = studentInfo.infos
+
+def process_GetQdKbList(raw):
+    raw_data = raw["Rows"]
+
+    return raw_data
+
+def process_GetXsQdInfo(raw_data):
+    payload = pl_getXsQdInfo
+    for i in raw_data:
+        for o in payload:
+            if o == i:
+                payload[o] = raw_data[i]
+                break
+    for i in stuInfo:
+        for o in payload:
+            if o == i:
+                payload[o] = stuInfo[i]
+                break
+    return payload
+
+def process_GetGpsWzJl(raw_data):
+    payload = pl_getGpsWzJl
+    for i in raw_data:
+        for o in payload:
+            if o == i:
+                payload[o] = raw_data[i]
+                break
+    for i in stuInfo:
+        for o in payload:
+            if o == i:
+                payload[o] = stuInfo[i]
+                break
+    return payload
+
+def process_SaveXsQdInfo(raw_data):
+    payload = pl_saveXsQdInfo
+    for i in raw_data:
+        for o in payload:
+            if o == i:
+                payload[o] = raw_data[i]
+                break
+    for i in stuInfo:
+        for o in payload:
+            if o == i:
+                payload[o] = stuInfo[i]
+                break
+    return payload
