@@ -4,6 +4,31 @@
     <meta charset="UTF-8">
     <title>课程签到 - {{ course.name }}</title>
     <style>
+        /* 自定义弹窗背景 */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;
+        }
+        /* 弹窗主体 */
+        .modal-box {
+            background: white; padding: 30px; border-radius: 20px; width: 80%; max-width: 320px;
+            text-align: center; box-shadow: 0 15px 35px rgba(0,0,0,0.2); animation: popIn 0.3s ease-out;
+        }
+        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        .modal-icon { font-size: 50px; margin-bottom: 15px; }
+        .modal-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #333; }
+        .modal-msg { color: #666; font-size: 14px; margin-bottom: 25px; line-height: 1.5; }
+
+        .modal-btn {
+            background: #007bff; color: white; border: none; padding: 10px 30px;
+            border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%;
+        }
+        /* 不同状态的颜色 */
+        .status-success { color: #52c41a; }
+        .status-error { color: #ff4d4f; }
+        .status-warning { color: #faad14; }
+
         body { font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f0f2f5; padding: 20px; }
         .signin-container { max-width: 450px; margin: 40px auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
 
@@ -90,6 +115,7 @@
 </div>
 
 <script>
+    let isSuccess = false;
     function toggleCodeInput() {
         var checkbox = document.getElementById('has_code');
         var wrapper = document.getElementById('code_input_wrapper');
@@ -103,6 +129,64 @@
             wrapper.style.display = 'none';
             // 隐藏时清空错误信息
             errorDiv.style.display = 'none';
+        }
+    }
+
+    // 拦截表单提交
+    document.getElementById('signinForm').addEventListener('submit', function(e) {
+        e.preventDefault(); // 阻止页面跳转刷新
+
+        if (!validateForm()) return; // 原有的本地校验
+
+        // 使用 AJAX提交数据
+        const formData = new FormData(this);
+        fetch(this.action, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            showCustomModal(data.status, data.message);
+        })
+        .catch(error => {
+            showCustomModal('error', '网络连接失败，请稍后再试');
+        });
+    });
+
+    function showCustomModal(status, message) {
+        const modal = document.getElementById('customModal');
+        const icon = document.getElementById('modalIcon');
+        const title = document.getElementById('modalTitle');
+        const msg = document.getElementById('modalMsg');
+
+        // 记录状态
+        isSuccess = (status === 'success');
+
+        if (status === 'success') {
+            icon.innerText = '✅';
+            title.innerText = '签到成功';
+            title.className = 'modal-title status-success';
+        } else if (status === 'error') {
+            icon.innerText = '❌';
+            title.innerText = '签到失败';
+            title.className = 'modal-title status-error';
+        } else {
+            icon.innerText = '⚠️';
+            title.innerText = '提示';
+            title.className = 'modal-title status-warning';
+        }
+
+        msg.innerText = message;
+        modal.style.display = 'flex';
+    }
+
+    function closeModal() {
+        if (isSuccess) {
+            // 如果签到成功，跳转回首页
+            window.location.href = "{{ url_for('index') }}";
+        } else {
+            // 如果是错误提示，仅关闭弹窗
+            document.getElementById('customModal').style.display = 'none';
         }
     }
 
@@ -137,6 +221,14 @@
         errorDiv.style.display = 'block';
     }
 </script>
-
+    <!-- 自定义弹窗 HTML -->
+    <div id="customModal" class="modal-overlay">
+        <div class="modal-box">
+            <div id="modalIcon" class="modal-icon"></div>
+            <div id="modalTitle" class="modal-title"></div>
+            <div id="modalMsg" class="modal-msg"></div>
+            <button class="modal-btn" onclick="closeModal()">确 定</button>
+        </div>
+    </div>
 </body>
 </html>

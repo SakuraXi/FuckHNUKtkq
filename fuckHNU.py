@@ -11,7 +11,7 @@ import requests
 import payLoadsUtils
 import studentInfo #############抓包获得的个人信息
 import signUtils
-from flask import Flask, render_template, redirect, url_for, request
+from flask import Flask, render_template, redirect, url_for, request, jsonify
 from datetime import datetime
 import json
 
@@ -37,6 +37,9 @@ infos = {
 app = Flask(__name__)
 serverUrl = "https://ktkq.hainanu.edu.cn/app"
 
+qdkblist = {}
+today_schedule = []
+
 def send_post(apiurl,postpayload):
     headers = {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -54,7 +57,8 @@ def send_post(apiurl,postpayload):
         print(f"请求发送失败: {e}")
 
 def signWithCode(classId, code, location):
-    # TODO 删除-1
+    global qdkblist, today_schedule
+    # TODO 删除-1 待有课测试
     pl = payLoadsUtils.process_GetXsQdInfo(qdkblist[classId-1])
     print("getXsQdInfo", pl)
 
@@ -64,11 +68,31 @@ def signWithCode(classId, code, location):
     pl2 = payLoadsUtils.process_SaveXsQdInfo(qdkblist[classId-1],code,location)
     print("saveXsQdInfo", pl2)
 
+    signInfoResult = send_post("getXsQdInfo", pl1)
+    distanceResult = send_post("getGpsWzJl", pl2)
+    signResult = send_post("saveXsQdInfo", pl2)
+
+    if float(distanceResult["signResult"]) < 350.0 and distanceResult["status"] == "1":
+        print(f"距离验证成功，距离{distanceResult["signResult"]}")
+    else:
+        print(f"距离验证失败，距离{distanceResult["signResult"]}")
+        return 2
+
+    if signResult["status"] == "6":
+        print("签到异常")
+        return 3
+    elif signResult["msg"] != "签到成功": ######判断根据不准确 没抓到签到码错误的包。。。
+        print("签到码错误")
+        return 4
+    print("签到成功")
+    return 1
+
 def signWithoutCode(classId, location):
-    pass
+    return 0
 
 @app.route('/')
 def index():
+    refreshClasses()
     now = datetime.now()
     date_str = now.strftime("%Y年%m月%d日")
     time_str = now.strftime("%H:%M:%S")
@@ -115,22 +139,25 @@ def do_signin(course_id):
     print(f"----------------")
 
     if has_code:
-        signWithCode(course_id, signin_code, selected_location)
+        status = signWithCode(course_id, signin_code, selected_location)
+        if status != 1:
+            if status == 4:
+                return jsonify({"status": "warning", "message": f"签到失败！签到码错误。错误码：{status}"})
+            return jsonify({"status": "error", "message": f"签到失败！错误码：{status}"})
     else:
-        signWithoutCode(course_id, selected_location)
+        status = signWithoutCode(course_id, selected_location)
+        if status != 1:
+            return jsonify({"status": "error", "message": f"签到失败！错误码：{status}"})
 
+    # return redirect(url_for('index'))
     for course in today_schedule:
         if course["id"] == course_id:
             course["status"] = "已签到"
             break
+    return jsonify({"status": "success", "message": "签到成功！"})
 
-    return redirect(url_for('index'))
-
-if __name__ == "__main__":
-    sign = signUtils.getSignAndTimestamp()
-    signUtils.sm2_valid(sign[0], signUtils.privateKey, sign[1])
-    print(f"SM2 签名结果: {sign}")
-
+def refreshClasses():
+    global qdkblist, today_schedule
     qdkblist = payLoadsUtils.process_GetQdKbList(send_post("getQdKbList", studentInfo.getExampleQdKbList(sign[0],sign[1])))
 
     ##########没课时用抓包数据测试
@@ -139,14 +166,10 @@ if __name__ == "__main__":
     # print(testjson)
     # qdkblist = payLoadsUtils.process_GetQdKbList(testjson)
 
-    if len(qdkblist) == 0:
-        print("今日无课！")
-        exit(114514)
-
     today_schedule = [{
         "id" : 0,
         "name": "大学英语",
-        "status": "未签到",
+        "status": "签到未开始",
         "location": "(海甸)6-205",
         "time": "7:40~9:20",
         "period": "第1,2节",
@@ -155,14 +178,17 @@ if __name__ == "__main__":
 
     for lec in qdkblist:
         lec_info = {"id": qdkblist.index(lec)+ 1}
+        isSigned, isSigning, isSignClose, isOnline = False,False,False,False
         for i in lec:
             if i == "kcMc":
                 lec_info["name"] = lec[i]
             elif i == "xsQdQkMc":
-                #TODO For Debugging
-
-                # lec_info["status"] = str(lec[i]) + "到"
-                lec_info["status"] = "未签到"
+                if lec[i] == "已签": isSigned = True
+            elif i == "qdQkMc":
+                if lec[i] == "签到中": isSigning = True
+                elif lec[i] == "已结束": isSignClose = True
+            elif i == "skXsStr":
+                if lec[i] == "线上": isOnline = True
             elif i == "skDd":
                 lec_info["location"] = lec[i]
             elif i == "skSj":
@@ -170,6 +196,33 @@ if __name__ == "__main__":
                 lec_info["period"] = str(lec[i]).split("(")[0]
             elif i == "skJs":
                 lec_info["teacher"] = lec[i]
+        if not isSigned and not isSigning and not isSignClose:
+            lec_info["status"] = "签到未开始"
+        elif not isSigned and isSigning:
+            lec_info["status"] = "可签到"
+        elif isSigned and isSigning and not isOnline:
+            lec_info["status"] = "已签(线下)"
+        elif isSigned and isSigning and isOnline:
+            lec_info["status"] = "已签(线上)"
+        elif not isSigned and isSignClose:
+            lec_info["status"] = "签到结束(未签)"
+        elif isSigned and isSignClose and not isOnline:
+            lec_info["status"] = "签到结束(已签线下)"
+        elif isSigned and isSignClose and isOnline:
+            lec_info["status"] = "签到结束(已签线上)"
+
         today_schedule.append(lec_info)
     print(today_schedule)
+
+if __name__ == "__main__":
+    sign = signUtils.getSignAndTimestamp()
+    signUtils.sm2_valid(sign[0], signUtils.privateKey, sign[1])
+    print(f"SM2 签名结果: {sign}")
+
+    refreshClasses()
+
+    if len(qdkblist) == 0:
+        print("今日无课！")
+        exit(114514)
+
     app.run(debug=True, port=5000)

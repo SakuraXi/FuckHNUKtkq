@@ -7,7 +7,6 @@
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; padding: 20px; }
         .card { background: white; max-width: 900px; margin: auto; padding: 30px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
 
-        /* 时间显示区域样式 */
         .time-header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #f0f2f5; padding-bottom: 20px; }
         .time-header h1 { margin: 0; color: #333; font-size: 28px; }
         .time-header p { margin: 5px 0; color: #666; font-size: 18px; }
@@ -18,7 +17,14 @@
         th { background: #f8f9fa; color: #555; font-weight: 600; }
         .btn-signin { color: #ff4d4f; text-decoration: none; font-weight: bold; border: 1px solid #ff4d4f; padding: 4px 8px; border-radius: 4px; }
         .btn-signin:hover { background: #ff4d4f; color: white; }
-        .status-done { color: #52c41a; font-weight: bold; }
+
+        .status-waiting { color: #00008B; font-weight: bold; }   /* 深蓝色 */
+        .status-missed  { color: #ff4d4f; font-weight: bold; }   /* 红色 */
+        .status-offline { color: #52c41a; font-weight: bold; }   /* 绿色 */
+        .status-online  { color: #daa520; font-weight: bold; }   /* 黄色（使用金麒麟色以防看不清） */
+
+        .btn-signin { color: #ff4d4f; text-decoration: none; font-weight: bold; border: 1px solid #ff4d4f; padding: 4px 8px; border-radius: 4px; }
+        .btn-signin:hover { background: #ff4d4f; color: white; }
     </style>
 </head>
 <body>
@@ -54,10 +60,22 @@
                 <td>{{ course.location }}</td>
                 <td>{{ course.teacher }}</td>
                 <td>
-                    {% if course.status == '未签到' %}
+                    {% if course.status == '可签到' %}
                         <a class="btn-signin" href="{{ url_for('signin_page', course_id=course.id) }}">立即签到</a>
+                    {% elif course.status == '签到未开始' %}
+                        <span class="status-waiting">{{ course.status }}</span>
+                    {% elif course.status == '签到结束(未签)' %}
+                        <span class="status-missed">{{ course.status }}</span>
+                    {% elif course.status == '已签(线下)' %}
+                        <span class="status-online">{{ course.status }}</span>
+                    {% elif course.status == '已签(线上)' %}
+                        <span class="status-offline">{{ course.status }}</span>
+                    {% elif course.status == '签到结束(已签线下)' %}
+                        <span class="status-offline">{{ course.status }}</span>
+                    {% elif course.status == '签到结束(已签线上)' %}
+                        <span class="status-online">{{ course.status }}</span>
                     {% else %}
-                        <span class="{% if course.status == '已签到' %}status-done{% endif %}">{{ course.status }}</span>
+                        <span>{{ course.status }}</span>
                     {% endif %}
                 </td>
             </tr>
