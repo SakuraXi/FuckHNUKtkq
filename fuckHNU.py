@@ -6,17 +6,20 @@
 # @Description: Automatically FUCK the attendance system of HNU and CRACK the reg-token violently.
 # @Version: 0.1
 
+import re
 import time
 import requests
 import payLoadsUtils
 import signUtils
-from flask import Flask, render_template, redirect, url_for
+from flask import Flask, render_template, redirect, url_for, request
 from datetime import datetime
 import json
 
 app = Flask(__name__)
 privateKey = "00f661332f70969150a8ea126943958a914cc05abc7e3ad3d96570cc4fd01a9ce4"
 serverUrl = "https://ktkq.hainanu.edu.cn/app"
+
+location_options = {"3号教学楼" : "", "4号教学楼" : "", "5号教学楼" : "", "实验楼" : "", "一田" : "", "二田" : ""}
 
 def send_post(apiurl,postpayload):
     headers = {
@@ -36,36 +39,47 @@ def send_post(apiurl,postpayload):
 
 @app.route('/')
 def index():
-    # 1. 获取当前时间并格式化
     now = datetime.now()
     date_str = now.strftime("%Y年%m月%d日")
     time_str = now.strftime("%H:%M:%S")
     week_list = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
     weekday_str = week_list[now.weekday()]
-
-    # 2. 将时间变量传给网页
-    return render_template('index.html',
-                           schedule=today_schedule,
-                           today_date=date_str,
-                           today_time=time_str,
-                           weekday=weekday_str)
+    return render_template('index.html', schedule=today_schedule, today_date=date_str, today_time=time_str, weekday=weekday_str)
 
 @app.route('/signin/<int:course_id>')
 def signin_page(course_id):
-    # 根据 ID 找到对应的课程
     course = next((item for item in today_schedule if item["id"] == course_id), None)
     if course:
-        return render_template('signin.html', course=course)
+        return render_template('signin.html', course=course, locations=location_options.keys())
     return "课程未找到", 404
 
-@app.route('/do_signin/<int:course_id>')
+
+@app.route('/do_signin/<int:course_id>', methods=['POST'])
 def do_signin(course_id):
-    # 在内存中修改变量状态
+    selected_location = request.form.get('location')
+    has_code = request.form.get('has_code')
+    signin_code = request.form.get('signin_code')
+
+    if has_code:
+        if not signin_code or not re.match(r'^\d{4}$', signin_code):
+            return "提交失败：签到码格式不正确（必须为4位数字）", 400
+
+    print(f"--- 收到签到请求 ---")
+    print(f"课程ID: {course_id}")
+    print(f"确认地点: {selected_location}")
+    print(f"是否有签到码: {'是' if has_code else '否'}")
+    if has_code:
+        print(f"签到码内容: {signin_code}")
+    print(f"------------------")
+
+    # 3. 更新内部变量状态
     for course in today_schedule:
         if course["id"] == course_id:
             course["status"] = "已签到"
+            # 也可以更新地点为用户确认的地点
+            course["location"] = selected_location
             break
-    # 签到成功后跳回主页
+
     return redirect(url_for('index'))
 
 if __name__ == "__main__":
@@ -101,9 +115,9 @@ if __name__ == "__main__":
         "id" : 0,
         "name": "大学英语",
         "status": "未签到",
-        "location": "教B-204",
-        "time": "10:00 - 11:35",
-        "period": "第3-4节",
+        "location": "(海甸)3-205",
+        "time": "10:00~11:35",
+        "period": "第3,4节",
         "teacher": "李老师"
     },]
 

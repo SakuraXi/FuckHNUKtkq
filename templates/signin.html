@@ -2,31 +2,144 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <title>课程签到</title>
+    <title>课程签到 - {{ course.name }}</title>
     <style>
-        body { font-family: sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .signin-box { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; width: 300px; }
-        .course-name { font-size: 24px; color: #333; margin-bottom: 10px; }
-        .info { color: #666; margin-bottom: 20px; }
-        .btn { display: inline-block; background: #52c41a; color: white; padding: 10px 25px; border-radius: 5px; text-decoration: none; font-size: 18px; transition: 0.3s; }
-        .btn:hover { background: #45a018; }
-        .back-link { display: block; margin-top: 15px; color: #999; text-decoration: none; font-size: 14px; }
+        body { font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f0f2f5; padding: 20px; }
+        .signin-container { max-width: 450px; margin: 40px auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+
+        h2 { text-align: center; color: #1a1a1a; margin-top: 0; }
+
+        /* 课程信息展示区域 */
+        .info-card {
+            background: #f8f9fa;
+            border-left: 5px solid #007bff;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 4px;
+        }
+        .info-card p { margin: 8px 0; color: #555; font-size: 15px; }
+        .info-card strong { color: #333; }
+
+        /* 表单样式 */
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; color: #444; }
+        select, input[type="text"] {
+            width: 100%; padding: 12px; border: 1px solid #ddd;
+            border-radius: 8px; box-sizing: border-box; font-size: 14px;
+        }
+
+        #code_input_wrapper { display: none; margin-top: 15px; background: #fffbe6; padding: 10px; border-radius: 8px; border: 1px dashed #ffe58f; }
+
+        /* 错误提示文字样式 */
+        .error-msg {
+            color: #ff4d4f;
+            font-size: 13px;
+            margin-top: 8px;
+            display: none; /* 默认隐藏 */
+        }
+
+        .btn-submit {
+            width: 100%; background: #007bff; color: white; border: none;
+            padding: 14px; border-radius: 8px; font-size: 16px; cursor: pointer;
+            font-weight: bold; transition: 0.3s; margin-top: 10px;
+        }
+        .btn-submit:hover { background: #0056b3; }
+        .back-link { display: block; text-align: center; margin-top: 20px; color: #888; text-decoration: none; font-size: 14px; }
     </style>
 </head>
 <body>
-    <div class="signin-box">
-        <div style="font-size: 50px;">📍</div>
-        <div class="course-name">{{ course.name }}</div>
-        <div class="info">
-            地点：{{ course.location }}<br>
-            教师：{{ course.teacher }}<br>
-            时间：{{ course.time }}
+
+<div class="signin-container">
+    <h2>课程签到确认</h2>
+
+    <div class="info-card">
+        <p><strong>课程名称：</strong>{{ course.name }}</p>
+        <p><strong>上课教师：</strong>{{ course.teacher }}</p>
+        <p><strong>上课时间：</strong>{{ course.time }} ({{ course.period }})</p>
+        <p><strong>课表地点：</strong>{{ course.location }}</p>
+    </div>
+
+    <!-- 1. 增加了 onsubmit 校验函数 -->
+    <form id="signinForm" action="{{ url_for('do_signin', course_id=course.id) }}" method="POST" onsubmit="return validateForm()">
+
+        <!-- 地点确认选择 -->
+        <div class="form-group">
+            <label for="location">📍 确认当前上课地点：</label>
+            <select name="location" id="location">
+                {% for loc in locations %}
+                <option value="{{ loc }}" {% if loc == course.location %}selected{% endif %}>{{ loc }}</option>
+                {% endfor %}
+            </select>
         </div>
 
-        <!-- 点击此按钮会调用 Python 里的 do_signin 函数 -->
-        <a href="{{ url_for('do_signin', course_id=course.id) }}" class="btn">确认签到</a>
+        <!-- 签到码选项 -->
+        <div class="form-group">
+            <input type="checkbox" id="has_code" name="has_code" onchange="toggleCodeInput()">
+            <label style="display: inline; cursor: pointer;" for="has_code">我有签到码</label>
+        </div>
 
-        <a href="/" class="back-link">返回课表</a>
-    </div>
+        <!-- 签到码输入框容器 -->
+        <div id="code_input_wrapper">
+            <label for="signin_code">验证码：</label>
+            <!-- 2. 增加了 maxlength 限制 -->
+            <input type="text" name="signin_code" id="signin_code" maxlength="4" placeholder="请输入4位数字签到码">
+            <!-- 3. 错误提示显示区域 -->
+            <div id="error_text" class="error-msg"></div>
+        </div>
+
+        <button type="submit" class="btn-submit">立即提交签到</button>
+        <a href="/" class="back-link">← 返回课表主页</a>
+    </form>
+</div>
+
+<script>
+    function toggleCodeInput() {
+        var checkbox = document.getElementById('has_code');
+        var wrapper = document.getElementById('code_input_wrapper');
+        var input = document.getElementById('signin_code');
+        var errorDiv = document.getElementById('error_text');
+
+        if (checkbox.checked) {
+            wrapper.style.display = 'block';
+            input.focus();
+        } else {
+            wrapper.style.display = 'none';
+            // 隐藏时清空错误信息
+            errorDiv.style.display = 'none';
+        }
+    }
+
+    // 4. 新增表单校验逻辑
+    function validateForm() {
+        var hasCode = document.getElementById('has_code').checked;
+        var codeInput = document.getElementById('signin_code').value.trim();
+        var errorDiv = document.getElementById('error_text');
+
+        // 只有在勾选了“我有签到码”时才进行判断
+        if (hasCode) {
+            // 判断是否为空
+            if (codeInput === "") {
+                showError("❌ 请输入签到码");
+                return false;
+            }
+
+            // 判断是否为4位数字
+            var reg = /^\d{4}$/;
+            if (!reg.test(codeInput)) {
+                showError("❌ 签到码格式错误：请输入4位纯数字");
+                return false;
+            }
+        }
+
+        return true; // 验证通过，允许提交
+    }
+
+    function showError(msg) {
+        var errorDiv = document.getElementById('error_text');
+        errorDiv.innerText = msg;
+        errorDiv.style.display = 'block';
+    }
+</script>
+
 </body>
 </html>
