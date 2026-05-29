@@ -106,16 +106,12 @@ def signin_page(course_id):
     if course:
         reloc = "3号教学楼"
         match = re.search(r"\)(\d{1,2})\-", today_schedule[course_id]["location"])
-        # print(match,today_schedule[course_id]["location"])
-        if match:
-            reloc = match.group(1) + "号教学楼"
-        elif "实验" in today_schedule[course_id]["location"]:
-            reloc = "实验楼"
-        elif "第一运动" in today_schedule[course_id]["location"]:
-            reloc = "一田"
-        elif "第二运动" in today_schedule[course_id]["location"]:
-            reloc = "二田"
+        if match: reloc = match.group(1) + "号教学楼"
+        elif "实验" in today_schedule[course_id]["location"]: reloc = "实验楼"
+        elif "第一运动" in today_schedule[course_id]["location"]: reloc = "一田"
+        elif "第二运动" in today_schedule[course_id]["location"]: reloc = "二田"
         print(reloc)
+
         return render_template('signin.html', course=course, locations=payLoadsUtils.location_options.keys(), recommend_loc=reloc)
     return "课程未找到", 404
 
