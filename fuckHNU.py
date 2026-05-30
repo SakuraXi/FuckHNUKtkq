@@ -48,22 +48,23 @@ today_schedule = []
 cur_student = ""
 
 total_requests = 10000  # 总请求数
-concurrent_limit = 50  # 最大并发数
+concurrent_limit = 20  # 最大并发数
 timeout_secs = 10
 
 user_agents = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Firefox/110.0",
+    "Mozilla/5.0 (Linux; Android 13; 2211133C Build/TKQ1.220807.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/111.0.5563.116 Mobile Safari/537.36 MMWEBID/5678 MicroMessenger/8.0.40.2420(0x28002837) Process/appbrand2 WeChat/8.0.40 NetType/4G Language/zh_CN ABI/arm64 MiniProgramEnv",
+    "Mozilla/5.0 (Linux; Android 12; ABY-AL00 Build/HUAWEIABY-AL00; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/116.0.5845.114 Mobile Safari/537.36 MMWEBID/1234 MicroMessenger/8.0.42.2460(0x28002A34) Process/appbrand0 WeChat/8.0.42 NetType/WIFI Language/zh_CN ABI/arm64 MiniProgramEnv",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 MicroMessenger/7.0.20.1781(0x6700143B) NetType/WIFI MiniProgramEnv/Windows WindowsWechat/WMPF WindowsWechat(0x63090a13) UnifiedPCWindowsWechat(0xf2541939) XWEB/19841",
     "Mozilla/5.0 (iPhone; CPU iPhone OS 26_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.73(0x18004935) NetType/WIFI Language/zh_CN",
 ]
+stop_event = asyncio.Event()
 
 app = Flask(__name__, template_folder=signUtils.resource_path('templates'))
 
 def send_post(apiurl,postpayload):
     headers = {
         "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 26_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.73(0x18004935) NetType/WIFI Language/zh_CN",
+        "User-Agent": random.choice(user_agents),
         "Accept-Encoding": "gzip,compress,br,deflate",
         "Referer": "https://servicewechat.com/wxa1e3abcd201139a2/35/page-frame.html"
     }
@@ -76,7 +77,14 @@ def send_post(apiurl,postpayload):
         print(f"请求发送失败: {e}")
 
 async def send_post_request(target_url, payload, session, semaphore, token):
+    # 如果已经触发了停止信号，直接退出，不再抢占信号量
+    if stop_event.is_set():
+        return None
     async with semaphore:  # 使用信号量控制并发
+        # 再次检查，防止在排队等待信号量期间触发了停止信号
+        if stop_event.is_set():
+            return None
+
         try:
             #随机请求头
             headers = {
@@ -99,10 +107,21 @@ async def send_post_request(target_url, payload, session, semaphore, token):
                 headers=headers,
                 timeout=timeout_secs
             ) as response:
-                # 只读取状态码，不读取全部响应内容以节省内存
-                status = response.status
-                # text = await response.text() # 需要看结果则取消注释
-                return status
+                if response.status == 200:
+                    # 读取并解析 JSON
+                    try:
+                        res_json = await response.json()
+
+                        if res_json.get("status") == "1":
+                            print(f"\n[!] 命中目标！签到码为：{token} 。正在停止后续任务...")
+                            stop_event.set()  # 触发全局停止信号
+                            return "STOPPED"
+
+                    except Exception as json_err:
+                        # 预防服务器返回的不是标准的JSON
+                        pass
+
+                return response.status
 
         except Exception as e:
             return f"Error: {e}"
@@ -208,7 +227,7 @@ def do_signin(course_id):
         status = signWithCode(cur_student, course_id, signin_code, selected_location)
         if status != 1:
             if status == 4:
-                return jsonify({"status": "warning", "message": f"签到失败！签到码错误。错误码：{status}"})
+                return jsonify({"status": "warning", "message": f"签到失败！签到码错误。"})
             return jsonify({"status": "error", "message": f"签到失败！错误码：{status}"})
     else:
         try:
@@ -231,7 +250,7 @@ def refreshClasses(student):
 
     qdkblist = payLoadsUtils.process_GetQdKbList(send_post("getQdKbList", payLoadsUtils.getStudentClassesPayload(student)))
     ##########没课时用抓包数据测试
-    # with open("test.json", "r", encoding="utf-8") as f:
+    # with open(signUtils.resource_path("test.json"), "r", encoding="utf-8") as f:
     #     testjson = json.load(f)
     # print(testjson)
     # qdkblist = payLoadsUtils.process_GetQdKbList(testjson)
