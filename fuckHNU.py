@@ -8,7 +8,6 @@
 
 import re
 import time
-
 import requests
 import payLoadsUtils
 import studentInfo #############抓包获得的个人信息
@@ -42,7 +41,6 @@ infos = {
 }
 """
 
-app = Flask(__name__)
 serverUrl = "https://ktkq.hainanu.edu.cn/app"
 
 qdkblist = {}
@@ -59,6 +57,8 @@ user_agents = [
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Firefox/110.0",
     "Mozilla/5.0 (iPhone; CPU iPhone OS 26_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.73(0x18004935) NetType/WIFI Language/zh_CN",
 ]
+
+app = Flask(__name__, template_folder=signUtils.resource_path('templates'))
 
 def send_post(apiurl,postpayload):
     headers = {

@@ -9,6 +9,7 @@
 import execjs
 import os
 import time
+import sys
 
 privateKey = "00f661332f70969150a8ea126943958a914cc05abc7e3ad3d96570cc4fd01a9ce4"
 
@@ -17,8 +18,13 @@ print(execjs.get().name)
 
 os.environ["NODE_PATH"] = os.path.join(os.getcwd(), "node_modules")
 
+def resource_path(relative_path):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
 def sm2_sign(msg_hex, priv_key_hex):
-    with open("sm2_bridge.js", "r", encoding="utf-8") as f:
+    with open(resource_path("sm2_bridge.js"), "r", encoding="utf-8") as f:
         js_code = f.read()
     ctx = execjs.compile(js_code)
     try:
@@ -29,7 +35,7 @@ def sm2_sign(msg_hex, priv_key_hex):
         return None
 
 def sm2_valid(signature, priv_key,testmsg):
-    with open("sm2_bridge.js", "r", encoding="utf-8") as f:
+    with open(resource_path("sm2_bridge.js"), "r", encoding="utf-8") as f:
         js_code = f.read()
 
     ctx = execjs.compile(js_code)
