@@ -4,6 +4,32 @@
     <meta charset="UTF-8">
     <title>我的课表</title>
     <style>
+        .user-selector {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 100;
+        }
+        .user-selector label {
+            font-size: 14px;
+            color: #666;
+            font-weight: bold;
+        }
+        .user-selector select {
+            padding: 5px 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            outline: none;
+            cursor: pointer;
+            background-color: #fff;
+        }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; padding: 20px; }
         .card { background: white; max-width: 900px; margin: auto; padding: 30px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
 
@@ -28,7 +54,22 @@
     </style>
 </head>
 <body>
+<!-- 右上角用户选择框 -->
+<div class="user-selector">
+    <label for="userSelect">👤 切换用户:</label>
+    <select id="userSelect" onchange="changeUser(this.value)">
+        {% for u in all_users %}
+        <option value="{{ u }}" {% if u == current_user %}selected{% endif %}>{{ u }}</option>
+        {% endfor %}
+    </select>
+</div>
 
+<script>
+    // 选择用户后，将用户名作为 URL 参数跳转，从而刷新页面
+    function changeUser(userName) {
+        window.location.href = "/?user=" + encodeURIComponent(userName);
+    }
+</script>
 <div class="card">
     <!-- 时间显示区域 -->
     <div class="time-header">

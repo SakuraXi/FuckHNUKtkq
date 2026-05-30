@@ -102,14 +102,34 @@ pl_saveXsQdInfo = {
     "qdLx": ""
 }
 
-stuInfo = studentInfo.infos
+def getStudentClassesPayload(student):
+    payload = pl_getQdKbList
+    stuInfo = studentInfo.getStudentInfo(student)
+    for i in stuInfo:
+        for o in payload:
+            if o == i:
+                payload[o] = stuInfo[i]
+                break
+    payload["zy"] = stuInfo["zyMc"]
+    payload["bj"] = stuInfo["bjMc"]
+    payload["userType"] = "1"
+    payload["xsCc"] = "1"
+    payload["scene"] = "1"
+    payload["key"] = "1"
+    payload["roleCode"] = "0"
+    payload["bm"] = "null"
+    sign = signUtils.getSignAndTimestamp()
+    payload["sign"] = sign[0]
+    payload["timestamp"] = sign[1]
+    return payload
 
 def process_GetQdKbList(raw):
     raw_data = raw["Rows"]
     return raw_data
 
-def process_GetXsQdInfo(raw_data):
+def process_GetXsQdInfo(student,raw_data):
     payload = pl_getXsQdInfo
+    stuInfo = studentInfo.getStudentInfo(student)
     for i in raw_data:
         for o in payload:
             if o == i:
@@ -126,8 +146,9 @@ def process_GetXsQdInfo(raw_data):
     payload["timestamp"] = sign[1]
     return payload
 
-def process_GetGpsWzJl(qdId,location):
+def process_GetGpsWzJl(student,qdId,location):
     payload = pl_getGpsWzJl
+    stuInfo = studentInfo.getStudentInfo(student)
     for i in stuInfo:
         for o in payload:
             if o == i:
@@ -144,8 +165,9 @@ def process_GetGpsWzJl(qdId,location):
     payload["sign"] = sign[0]
     return payload
 
-def process_SaveXsQdInfo(qdKcInfo, code, location):
+def process_SaveXsQdInfo(student,qdKcInfo, code, location):
     payload = pl_saveXsQdInfo
+    stuInfo = studentInfo.getStudentInfo(student)
     for i in qdKcInfo:
         for o in payload:
             if o == i:

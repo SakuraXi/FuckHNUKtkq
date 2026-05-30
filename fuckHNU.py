@@ -92,13 +92,15 @@ def signWithoutCode(classId, location):
 
 @app.route('/')
 def index():
-    refreshClasses()
+    current_user = request.args.get('user', list(studentInfo.users_list.keys())[0])
+    refreshClasses(current_user)
+
     now = datetime.now()
     date_str = now.strftime("%Y年%m月%d日")
     time_str = now.strftime("%H:%M:%S")
     week_list = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
     weekday_str = week_list[now.weekday()]
-    return render_template('index.html', schedule=today_schedule, today_date=date_str, today_time=time_str, weekday=weekday_str)
+    return render_template('index.html',all_users=studentInfo.users_list,current_user=current_user, schedule=today_schedule, today_date=date_str, today_time=time_str, weekday=weekday_str)
 
 @app.route('/signin/<int:course_id>')
 def signin_page(course_id):
@@ -152,10 +154,13 @@ def do_signin(course_id):
             break
     return jsonify({"status": "success", "message": "签到成功！"})
 
-def refreshClasses():
+def refreshClasses(student):
     global qdkblist, today_schedule
-    qdkblist = payLoadsUtils.process_GetQdKbList(send_post("getQdKbList", studentInfo.getExampleQdKbList(sign[0],sign[1])))
+    sign = signUtils.getSignAndTimestamp()
+    signUtils.sm2_valid(sign[0], signUtils.privateKey, sign[1])
+    print(f"SM2 签名结果: {sign}")
 
+    qdkblist = payLoadsUtils.process_GetQdKbList(send_post("getQdKbList", payLoadsUtils.getStudentClassesPayload(student)))
     ##########没课时用抓包数据测试
     # with open("test.json", "r", encoding="utf-8") as f:
     #     testjson = json.load(f)
@@ -211,11 +216,7 @@ def refreshClasses():
     print(today_schedule)
 
 if __name__ == "__main__":
-    sign = signUtils.getSignAndTimestamp()
-    signUtils.sm2_valid(sign[0], signUtils.privateKey, sign[1])
-    print(f"SM2 签名结果: {sign}")
-
-    refreshClasses()
+    refreshClasses(list(studentInfo.users_list.keys())[0])
 
     if len(qdkblist) == 0:
         print("今日无课！")
