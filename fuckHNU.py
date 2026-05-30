@@ -21,6 +21,7 @@ import asyncio
 import aiohttp
 import random
 from tqdm.asyncio import tqdm
+import ctypes
 
 """
 studentInfo内的个人信息格式(抓getUserOpenId这个包里面都有)：
@@ -288,6 +289,7 @@ if __name__ == "__main__":
     refreshClasses(list(studentInfo.users_list.keys())[0])
     if len(qdkblist) == 0:
         print("今日无课！")
+        ctypes.windll.user32.MessageBoxW(0, "今日无课！", "海大课堂考勤Pro Max", 64)
         exit(114514)
     webview.create_window('海大课堂考勤Pro Max', app, width=1000, height=600)
     webview.start()
