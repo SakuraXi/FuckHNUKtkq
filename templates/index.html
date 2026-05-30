@@ -4,6 +4,15 @@
     <meta charset="UTF-8">
     <title>我的课表</title>
     <style>
+        /* 初始状态为透明 */
+        body {
+            opacity: 0;
+            transition: opacity 0.4s ease-in-out;
+        }
+        /* 页面显示时的状态 */
+        body.page-visible {
+            opacity: 1;
+        }
         .user-selector {
             position: absolute;
             top: 20px;
@@ -51,6 +60,36 @@
 
         .btn-signin { color: #ff4d4f; text-decoration: none; font-weight: bold; border: 1px solid #ff4d4f; padding: 4px 8px; border-radius: 4px; }
         .btn-signin:hover { background: #ff4d4f; color: white; }
+        .refresh-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 50px;
+            height: 50px;
+            background: white;
+            border: none;
+            border-radius: 50%;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 100;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        /* 悬停动画效果 */
+        .refresh-btn:hover {
+            transform: scale(1.1) rotate(30deg);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+        }
+
+        /* 刷新图标颜色（蓝色，与时间显示一致） */
+        .refresh-btn svg {
+            width: 24px;
+            height: 24px;
+            fill: #007bff;
+        }
     </style>
 </head>
 <body>
@@ -64,12 +103,6 @@
     </select>
 </div>
 
-<script>
-    // 选择用户后，将用户名作为 URL 参数跳转，从而刷新页面
-    function changeUser(userName) {
-        window.location.href = "/?user=" + encodeURIComponent(userName);
-    }
-</script>
 <div class="card">
     <!-- 时间显示区域 -->
     <div class="time-header">
@@ -124,6 +157,40 @@
         </tbody>
     </table>
 </div>
+    <!-- 右下角刷新按钮 -->
+    <button class="refresh-btn" onclick="refreshPage()" title="刷新课表">
+        <svg viewBox="0 0 24 24">
+            <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+        </svg>
+    </button>
+<script>
+    // 选择用户后，将用户名作为 URL 参数跳转，从而刷新页面
+    function changeUser(userName) {
+        document.body.classList.remove('page-visible');
+        setTimeout(() => {
+            window.location.href = "/?user=" + encodeURIComponent(userName);
+        }, 400);
+    }
 
+    document.addEventListener("DOMContentLoaded", () => {
+        document.body.classList.add('page-visible');
+    });
+
+    function refreshPage() {
+        document.body.classList.remove('page-visible'); // 触发渐出
+        setTimeout(() => {
+            window.location.reload(); // 400ms 动画结束后重新加载
+        }, 400);
+    }
+
+    document.querySelectorAll('.animate-link').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const href = this.href;
+            document.body.classList.remove('page-visible');
+            setTimeout(() => { window.location.href = href; }, 400);
+        });
+    });
+</script>
 </body>
 </html>
