@@ -269,7 +269,6 @@ def refreshClasses(student):
     cur_student = student
     sign = signUtils.getSignAndTimestamp()
     signUtils.sm2_valid(sign[0], signUtils.privateKey, sign[1])
-    print(f"SM2 签名结果: {sign}")
 
     qdkblist = payLoadsUtils.process_GetQdKbList(send_post("getQdKbList", payLoadsUtils.getStudentClassesPayload(student)))
     ##########没课时用抓包数据测试
