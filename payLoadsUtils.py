@@ -161,8 +161,7 @@ def process_GetGpsWzJl(student,qdId,location):
     payload["wzJd2"] = "0.0"
     payload["wzWd2"] = "0.0"
     payload["qdId"] = qdId
-    sign = signUtils.getSignAndTimestamp()
-    payload["sign"] = sign[0]
+    payload["sign"] = stuInfo["wxSign"]
     return payload
 
 def process_SaveXsQdInfo(student,qdKcInfo, code, location):

