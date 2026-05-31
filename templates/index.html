@@ -78,6 +78,23 @@
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
+        /* 今日无课提示样式 */
+        .no-course-card {
+            text-align: center;
+            padding: 60px 0;
+            color: #999;
+        }
+        .no-course-card .icon {
+            font-size: 50px;
+            margin-bottom: 15px;
+            display: block;
+        }
+        .no-course-card .text {
+            font-size: 20px;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+
         /* 悬停动画效果 */
         .refresh-btn:hover {
             transform: scale(1.1) rotate(30deg);
@@ -114,6 +131,7 @@
         </p>
     </div>
 
+{% if schedule %}
     <table>
         <thead>
             <tr>
@@ -156,6 +174,13 @@
             {% endfor %}
         </tbody>
     </table>
+{% else %}
+    <!-- 当 schedule 为空时显示 -->
+    <div class="no-course-card">
+        <span class="icon">🏖️</span>
+        <span class="text">今日无课</span>
+    </div>
+{% endif %}
 </div>
     <!-- 右下角刷新按钮 -->
     <button class="refresh-btn" onclick="refreshPage()" title="刷新课表">

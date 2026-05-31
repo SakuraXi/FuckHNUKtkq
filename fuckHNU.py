@@ -38,6 +38,7 @@ infos = {
     "zyMc": "", 专业名
     "xyMc": "", 学院名
     "xn" : "2025-2026", 学年
+    "wxSign" : "" 微信userBindInfo里自带的签名，每个用户为不同的固定值
 }
 """
 
@@ -325,15 +326,9 @@ def refreshClasses(student):
             lec_info["status"] = "签到结束(已签线下)"
         elif isSigned and isSignClose and isOnline:
             lec_info["status"] = "签到结束(已签线上)"
-        lec_info["status"] = "可签到"
         today_schedule.append(lec_info)
     print("today", today_schedule)
 
 if __name__ == "__main__":
-    refreshClasses(list(studentInfo.users_list.keys())[0])
-    if len(qdkblist) == 0:
-        print("今日无课！")
-        ctypes.windll.user32.MessageBoxW(0, "今日无课！", "海大课堂考勤Pro Max", 64)
-        exit(114514)
     main_window = webview.create_window('海大课堂考勤Pro Max', app, width=1000, height=600)
     webview.start()
