@@ -7,12 +7,15 @@
 # @Version: 0.1
 
 import re
+import socket
+import threading
 import time
 import requests
 import payLoadsUtils
-import studentInfo #############抓包获得的个人信息
 import signUtils
-from flask import Flask, render_template, redirect, url_for, request, jsonify
+import getStuInfo
+import studentInfo
+from flask import Flask, render_template, request, jsonify
 from datetime import datetime
 import webview
 import json
@@ -20,40 +23,21 @@ import asyncio
 import aiohttp
 import random
 from tqdm.asyncio import tqdm
+import winreg
 import ctypes
-
-"""
-studentInfo内的个人信息格式(抓getUserOpenId这个包里面都有)：
-infos = {
-    "unitCode" : "", 用户码
-    "userCode" : "", 学号
-    "userName": "", 姓名
-    "syMc": "", 书院名
-    "syBjMc": "", 书院班级名
-    "dsZgh": "", 导师号
-    "dsXm": "", 导师姓名
-    "fdyZgh": "", 辅导员号
-    "fdyXm": "", 辅导员姓名
-    "bjMc": "", 学院班级名
-    "zyMc": "", 专业名
-    "xyMc": "", 学院名
-    "xn" : "2025-2026", 学年
-    "wxSign" : "" 微信userBindInfo里自带的签名，每个用户为不同的固定值
-}
-"""
+import atexit
 
 serverUrl = "https://ktkq.hainanu.edu.cn/app"
 
 qdkblist = {}
 today_schedule = []
 cur_student = ""
-
+new_user = None
 total_requests = 10000  # 总请求数
 concurrent_limit = 40  # 最大并发数
 timeout_secs = 10
 
 main_window = None
-
 user_agents = [
     "Mozilla/5.0 (Linux; Android 13; 2211133C Build/TKQ1.220807.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/111.0.5563.116 Mobile Safari/537.36 MMWEBID/5678 MicroMessenger/8.0.40.2420(0x28002837) Process/appbrand2 WeChat/8.0.40 NetType/4G Language/zh_CN ABI/arm64 MiniProgramEnv",
     "Mozilla/5.0 (Linux; Android 12; ABY-AL00 Build/HUAWEIABY-AL00; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/116.0.5845.114 Mobile Safari/537.36 MMWEBID/1234 MicroMessenger/8.0.42.2460(0x28002A34) Process/appbrand0 WeChat/8.0.42 NetType/WIFI Language/zh_CN ABI/arm64 MiniProgramEnv",
@@ -64,6 +48,34 @@ stop_event = asyncio.Event()
 exploit_token = "000000"
 
 app = Flask(__name__, template_folder=signUtils.resource_path('templates'))
+
+def clean_system_proxy():
+    xpath = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, xpath, 0, winreg.KEY_WRITE)
+        winreg.SetValueEx(key, "ProxyEnable", 0, winreg.REG_DWORD, 0)
+        winreg.CloseKey(key)
+
+        # 刷新系统设置
+        ctypes.windll.wininet.InternetSetOptionW(0, 39, 0, 0)
+        ctypes.windll.wininet.InternetSetOptionW(0, 37, 0, 0)
+        print("[*] 系统代理状态: 关闭")
+    except Exception as e:
+        print(f"[!] 代理配置失败: {e}")
+
+def add_new_user(user_name,user_data):
+    try:
+        with open(signUtils.resource_path("studentsInfo.json"), "r", encoding="utf-8") as f:
+            old_data = f.read()
+        new_json = json.loads(old_data)
+        new_json["users"][user_name] = user_data["userCode"]
+        new_json["infos"].append(user_data)
+        with open(signUtils.resource_path("studentsInfo.json"), "w", encoding="utf-8") as f:
+            f.write(json.dumps(new_json, ensure_ascii=False))
+        return 1
+    except Exception as e:
+        print(e)
+        return 0
 
 def send_post(apiurl,postpayload):
     headers = {
@@ -207,14 +219,15 @@ async def signWithoutCode(student, classId, location):
 
 @app.route('/')
 def index():
-    refreshClasses(request.args.get('user', list(studentInfo.users_list.keys())[0]))
+    users = studentInfo.get_users().keys()
+    refreshClasses(request.args.get('user', list(users)[0]))
 
     now = datetime.now()
     date_str = now.strftime("%Y年%m月%d日")
     time_str = now.strftime("%H:%M:%S")
     week_list = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
     weekday_str = week_list[now.weekday()]
-    return render_template('index.html',all_users=studentInfo.users_list,current_user=cur_student, schedule=today_schedule, today_date=date_str, today_time=time_str, weekday=weekday_str)
+    return render_template('index.html',all_users=users,current_user=cur_student, schedule=today_schedule, today_date=date_str, today_time=time_str, weekday=weekday_str)
 
 @app.route('/signin/<int:course_id>')
 def signin_page(course_id):
@@ -268,6 +281,33 @@ def do_signin(course_id):
             break
     return jsonify({"status": "success", "message": "签到成功！"})
 
+@app.route('/upload', methods=['POST'])
+def receive_data():
+    global new_user
+    data = payLoadsUtils.process_GetUserOpenId(request.json)
+    print(f"收到数据: {data}")
+    if new_user:
+        stat = add_new_user(new_user,data)
+    clean_system_proxy()
+    main_window.load_url(f"http://127.0.0.1:{my_port}")
+    if stat == 0:
+        return jsonify({"status": "error", "message": "添加失败"})
+    return jsonify({"status": "success", "message": "添加成功"})
+
+@app.route('/add_user', methods=['POST'])
+def add_user():
+    global new_user
+    data = request.json
+    new = data.get('username')
+
+    if new:
+        print(f"收到新增用户请求: {new}")
+        new_user = new
+        daemon = threading.Thread(target=getStuInfo.runProxy,kwargs={'upload_port': str(my_port)}, daemon=True)
+        daemon.start()
+        return jsonify({"status": "success", "message": "正在抓包"})
+    return jsonify({"status": "error", "message": "用户名不能为空"}), 400
+
 def refreshClasses(student):
     global qdkblist, today_schedule, cur_student
     cur_student = student
@@ -280,16 +320,6 @@ def refreshClasses(student):
     #     testjson = json.load(f)
     # print(testjson)
     # qdkblist = payLoadsUtils.process_GetQdKbList(testjson)
-
-    # today_schedule = [{
-    #     "id" : 0,
-    #     "name": "大学英语",
-    #     "status": "签到未开始",
-    #     "location": "(海甸)6-205",
-    #     "time": "7:40~9:20",
-    #     "period": "第1,2节",
-    #     "teacher": "112233"
-    # },]
     today_schedule = []
 
     for lec in qdkblist:
@@ -329,6 +359,23 @@ def refreshClasses(student):
         today_schedule.append(lec_info)
     print("today", today_schedule)
 
+def get_free_port():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(('127.0.0.1', 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
+
+def start_up(port):
+    try:
+        app.run(port=port, debug=False)
+    finally:
+        clean_system_proxy()
+
 if __name__ == "__main__":
-    main_window = webview.create_window('海大课堂考勤Pro Max', app, width=1000, height=600)
+    my_port = get_free_port()
+    print(my_port)
+    atexit.register(clean_system_proxy)
+    threading.Thread(target=start_up,kwargs={'port': str(my_port)}, daemon=True).start()
+    main_window = webview.create_window('海大课堂考勤Pro Max', f'http://127.0.0.1:{my_port}', width=1000, height=600)
     webview.start()

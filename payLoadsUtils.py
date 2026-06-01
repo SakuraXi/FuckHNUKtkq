@@ -123,6 +123,25 @@ def getStudentClassesPayload(student):
     payload["timestamp"] = sign[1]
     return payload
 
+def process_GetUserOpenId(raw_json):
+    info = {}
+    userBindInfo = raw_json["userBindInfo"]
+    info["unitCode"] = userBindInfo["unitCode"]
+    info["userCode"] = userBindInfo["userCode"]
+    info["userName"] = userBindInfo["userName"]
+    info["syMc"] = userBindInfo["syMc"]
+    info["syBjMc"] = userBindInfo["syBjMc"]
+    info["dsZgh"] = userBindInfo["dsZgh"]
+    info["dsXm"] = userBindInfo["dsXm"]
+    info["fdyZgh"] = userBindInfo["fdyZgh"]
+    info["fdyXm"] = userBindInfo["fdyXm"]
+    info["bjMc"] = userBindInfo["bj"]
+    info["zyMc"] = userBindInfo["zy"]
+    info["xyMc"] = userBindInfo["xy"]
+    info["xn"] = "2025-2026"
+    info["wxSign"] = userBindInfo["sign"]
+    return info
+
 def process_GetQdKbList(raw):
     raw_data = raw["Rows"]
     return raw_data
