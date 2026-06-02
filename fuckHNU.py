@@ -9,7 +9,7 @@
 import subprocess
 import sys
 
-# 1. 第一时间修补 subprocess，防止后续导入的模块触发错误
+# 第一时间修补 subprocess，防止后续导入的模块触发错误
 if sys.platform.startswith('win'):
     class SafePopen(subprocess.Popen):
         def __init__(self, *args, **kwargs):
@@ -61,14 +61,6 @@ user_agents = [
 stop_event = asyncio.Event()
 exploit_token = "000000"
 did_adding_users = False
-
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    encoding='utf-8',
-    filename="app.log"
-)
 
 app = Flask(__name__, template_folder=signUtils.resource_path('templates'))
 
@@ -438,6 +430,13 @@ def start_up(port):
 
 if __name__ == "__main__":
     detect_first_run()
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        encoding='utf-8',
+        filename=os.path.expandvars(r"%APPDATA%\FuckHNUktkq\app.log")
+    )
     my_port = get_free_port()
     atexit.register(clean_system_proxy)
     threading.Thread(target=start_up,kwargs={'port': str(my_port)}, daemon=True).start()
