@@ -135,6 +135,26 @@
             letter-spacing: 2px;
         }
 
+        /* 等待动画 */
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #007bff;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 结果弹窗的特定图标颜色 */
+        .status-success { color: #52c41a; font-weight: bold; }
+        .status-error { color: #ff4d4f; font-weight: bold; }
+
         /* 悬停动画效果 */
         .refresh-btn:hover {
             transform: scale(1.1) rotate(30deg);
@@ -246,6 +266,24 @@
             </div>
         </div>
     </div>
+    <!-- 加载等待弹窗 -->
+    <div id="loadingModal" class="modal-overlay">
+        <div class="modal-box" style="width: 250px;">
+            <div class="spinner"></div>
+            <p id="loadingText" style="margin-top: 15px; color: #666; font-size: 14px;">正在准备抓包环境...</p>
+        </div>
+    </div>
+
+    <!-- 结果提示弹窗 (Success/Error) -->
+    <div id="resultModal" class="modal-overlay">
+        <div class="modal-box">
+            <div id="resultIcon" style="font-size: 50px; margin-bottom: 10px;"></div>
+            <h3 id="resultTitle"></h3>
+            <p id="resultMsg" style="color: #666; font-size: 14px; margin-bottom: 20px;"></p>
+            <button class="btn-confirm" onclick="closeResultModal()">确 定</button>
+        </div>
+    </div>
+
 <script>
     // 选择用户后，将用户名作为 URL 参数跳转，从而刷新页面
     function changeUser(userName) {
@@ -285,12 +323,21 @@
         document.getElementById('newUserName').value = '';
     }
 
+    function updateLoadingStatus(msg) {
+        document.getElementById('loadingText').innerText = msg;
+    }
+
     function submitNewUser() {
         const userName = document.getElementById('newUserName').value.trim();
         if (!userName) {
             alert("请输入用户名！");
             return;
         }
+
+        // 1. 隐藏输入框，显示加载框
+        document.getElementById('addUserModal').style.display = 'none';
+        document.getElementById('loadingModal').style.display = 'flex';
+        updateLoadingStatus("正在初始化抓包服务...");
 
         fetch('/add_user', {
             method: 'POST',
@@ -300,11 +347,31 @@
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
+                // 注意：这里不要立即关闭加载框，因为 Python 还在后台抓包
+                // 抓包成功后，Python 会通过 /upload 逻辑重载页面或调用 JS
             } else {
-                alert("添加失败: " + data.message);
+                showResult('error', '失败', data.message);
             }
         })
-        .catch(error => alert("网络请求失败"));
+        .catch(error => showResult('error', '错误', '请求异常'));
+    }
+
+    // 显示最终结果
+    function showResult(type, title, msg) {
+        document.getElementById('loadingModal').style.display = 'none';
+        document.getElementById('addUserModal').style.display = 'none';
+
+        document.getElementById('resultIcon').innerText = (type === 'success' ? '✅' : '❌');
+        document.getElementById('resultTitle').innerText = title;
+        document.getElementById('resultTitle').className = (type === 'success' ? 'status-success' : 'status-error');
+        document.getElementById('resultMsg').innerText = msg;
+        document.getElementById('resultModal').style.display = 'flex';
+    }
+
+    function closeResultModal() {
+        document.getElementById('resultModal').style.display = 'none';
+        // 如果成功了，可以在这里执行刷新逻辑
+        location.reload();
     }
 </script>
 </body>

@@ -1,0 +1,1 @@
+pyinstaller --noconfirm --onedir --console --add-data "templates;templates" --add-data "sm2_bridge.js;." --add-data "mitmproxy-ca-cert.cer;." --add-data "mitmProxy.py;." --add-data "studentsInfo.json;." --add-data "node_modules;node_modules" --add-binary "node/node.exe;node" fuckHNU.py

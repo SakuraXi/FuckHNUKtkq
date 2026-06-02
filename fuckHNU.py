@@ -6,6 +6,7 @@
 # @Description: FUCK the signing system of HNU and CRACK the sign-token.
 # @Version: 0.1
 
+import os
 import re
 import socket
 import threading
@@ -26,6 +27,7 @@ from tqdm.asyncio import tqdm
 import winreg
 import ctypes
 import atexit
+import logging
 
 serverUrl = "https://ktkq.hainanu.edu.cn/app"
 
@@ -46,10 +48,20 @@ user_agents = [
 ]
 stop_event = asyncio.Event()
 exploit_token = "000000"
+did_adding_users = False
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    encoding='utf-8',
+    filename="app.log"
+)
 
 app = Flask(__name__, template_folder=signUtils.resource_path('templates'))
 
 def clean_system_proxy():
+    if not did_adding_users: return
     xpath = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
     try:
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, xpath, 0, winreg.KEY_WRITE)
@@ -59,22 +71,34 @@ def clean_system_proxy():
         # 刷新系统设置
         ctypes.windll.wininet.InternetSetOptionW(0, 39, 0, 0)
         ctypes.windll.wininet.InternetSetOptionW(0, 37, 0, 0)
-        print("[*] 系统代理状态: 关闭")
+        logging.info("系统代理状态: 关闭")
     except Exception as e:
-        print(f"[!] 代理配置失败: {e}")
+        logging.error(f"代理配置失败: {e}")
 
 def add_new_user(user_name,user_data):
     try:
         with open(signUtils.resource_path("studentsInfo.json"), "r", encoding="utf-8") as f:
             old_data = f.read()
+        is_old = False
         new_json = json.loads(old_data)
+        try:
+            if "null" in new_json["users"].keys():
+                if new_json["users"]["null"] == "null":
+                    new_json["users"].pop("null")
+        except:
+            pass
+        for o in new_json["infos"]:
+            if o["userCode"] == user_data["userCode"] and o["userName"] == user_data["userName"]:
+                is_old = True
+                break
+        if is_old : return 2
         new_json["users"][user_name] = user_data["userCode"]
         new_json["infos"].append(user_data)
         with open(signUtils.resource_path("studentsInfo.json"), "w", encoding="utf-8") as f:
             f.write(json.dumps(new_json, ensure_ascii=False))
         return 1
     except Exception as e:
-        print(e)
+        logging.debug(e)
         return 0
 
 def send_post(apiurl,postpayload):
@@ -87,10 +111,10 @@ def send_post(apiurl,postpayload):
     try:
         response = requests.post(url=serverUrl + "/" + apiurl, data=postpayload, headers=headers, timeout=10)
         response.raise_for_status()
-        print("返回结果:", response.text)
+        logging.debug("返回结果:" + response.text)
         return response.json()
     except requests.exceptions.RequestException as e:
-        print(f"请求发送失败: {e}")
+        logging.error(f"请求发送失败: {e}")
 
 async def send_post_request(target_url, payload, session, semaphore, token):
     global exploit_token
@@ -128,9 +152,9 @@ async def send_post_request(target_url, payload, session, semaphore, token):
                     # 读取并解析 JSON
                     try:
                         res_json = await response.json()
-                        print(res_json)
+                        logging.debug(res_json)
                         if res_json.get("status") == 1:
-                            print(f"\n[!] 命中目标！签到码为：{token} 。正在停止后续任务...")
+                            logging.info(f"\n命中目标！签到码为：{token} 。正在停止后续任务...")
                             exploit_token = token
                             stop_event.set()  # 触发全局停止信号
                             return "STOPPED"
@@ -147,32 +171,32 @@ async def send_post_request(target_url, payload, session, semaphore, token):
 def signWithCode(student, classId, code, location):
     global qdkblist, today_schedule
     pl = payLoadsUtils.process_GetXsQdInfo(student,qdkblist[classId])
-    print("getXsQdInfo", pl)
+    logging.debug("getXsQdInfo" + str(pl))
 
     signInfoResult = send_post("getXsQdInfo", pl)
     time.sleep(random.uniform(0.2, 0.4))
     pl1 = payLoadsUtils.process_GetGpsWzJl(student,qdkblist[classId]["qdId"],location)
-    print("getGpsWzJl", pl1)
+    logging.debug("getGpsWzJl" + str(pl1))
     distanceResult = send_post("getGpsWzJl", pl1)
 
     if float(distanceResult["wzJl"]) < 350.0 and distanceResult["status"] == 1:
-        print(f"距离验证成功，距离{distanceResult["wzJl"]}")
+        logging.info(f"距离验证成功，距离{distanceResult["wzJl"]}")
     else:
-        print(f"距离验证失败，距离{distanceResult["wzJl"]}")
+        logging.info(f"距离验证失败，距离{distanceResult["wzJl"]}")
         return 2
 
     time.sleep(random.uniform(0.2, 0.4))
     pl2 = payLoadsUtils.process_SaveXsQdInfo(student,qdkblist[classId],code,location)
-    print("saveXsQdInfo", pl2)
+    logging.debug("saveXsQdInfo" + str(pl2))
     signResult = send_post("saveXsQdInfo", pl2)
 
     if signResult["status"] == "6":
-        print("签到异常")
+        logging.info("签到异常")
         return 3
     elif signResult["msg"] != "签到成功": ######判断根据不准确 没抓到签到码错误的包。。。
-        print("签到码错误")
+        logging.info("签到码错误")
         return 4
-    print("签到成功")
+    logging.info("签到成功")
     return 1
 
 async def signWithoutCode(student, classId, location):
@@ -239,7 +263,6 @@ def signin_page(course_id):
         elif "实验" in today_schedule[course_id]["location"]: reloc = "实验楼"
         elif "第一运动" in today_schedule[course_id]["location"]: reloc = "一田"
         elif "第二运动" in today_schedule[course_id]["location"]: reloc = "二田"
-        print(reloc)
 
         return render_template('signin.html', course=course, locations=payLoadsUtils.location_options.keys(), recommend_loc=reloc)
     return "课程未找到", 404
@@ -255,13 +278,13 @@ def do_signin(course_id):
         if not signin_code or not re.match(r'^\d{4}$', signin_code):
             return "提交失败：签到码格式不正确（必须为4位数字）", 400
 
-    print(f"---- 签到请求 ----")
-    print(f"课程ID: {course_id}")
-    print(f"确认地点: {selected_location}")
-    print(f"是否有签到码: {'是' if has_code else '否'}")
+    logging.info(f"---- 签到请求 ----")
+    logging.info(f"课程ID: {course_id}")
+    logging.info(f"确认地点: {selected_location}")
+    logging.info(f"是否有签到码: {'是' if has_code else '否'}")
     if has_code:
-        print(f"签到码内容: {signin_code}")
-    print(f"----------------")
+        logging.info(f"签到码内容: {signin_code}")
+    logging.info(f"----------------")
 
     if has_code:
         status = signWithCode(cur_student, course_id, signin_code, selected_location)
@@ -284,41 +307,59 @@ def do_signin(course_id):
 @app.route('/upload', methods=['POST'])
 def receive_data():
     global new_user
+    if main_window:
+        main_window.evaluate_js("updateLoadingStatus('抓包成功，正在保存用户信息...')")
     data = payLoadsUtils.process_GetUserOpenId(request.json)
-    print(f"收到数据: {data}")
+    logging.debug(f"收到新用户数据: {data}")
     if new_user:
         stat = add_new_user(new_user,data)
     clean_system_proxy()
-    main_window.load_url(f"http://127.0.0.1:{my_port}")
-    if stat == 0:
-        return jsonify({"status": "error", "message": "添加失败"})
-    return jsonify({"status": "success", "message": "添加成功"})
+    if stat == 1:
+        if main_window:
+            main_window.evaluate_js(f"showResult('success', '添加成功', '用户 {new_user} 已成功导入！')")
+    elif stat == 2:
+        if main_window:
+            main_window.evaluate_js(f"showResult('warning', '添加失败', '用户 {studentInfo.getStudentInfoByCode(data["userCode"])["userName"]} 已存在！')")
+    else:
+        if main_window:
+            main_window.evaluate_js("showResult('error', '添加失败', '保存文件时发生错误')")
+
+    return jsonify({"status": "success"})
 
 @app.route('/add_user', methods=['POST'])
 def add_user():
-    global new_user
+    global new_user, did_adding_users
     data = request.json
     new = data.get('username')
-
+    if new in studentInfo.get_users().keys(): return jsonify({"status": "error", "message": "用户已存在"}), 400
+    did_adding_users = True
     if new:
-        print(f"收到新增用户请求: {new}")
+        logging.info(f"收到新增用户请求: {new}")
         new_user = new
         daemon = threading.Thread(target=getStuInfo.runProxy,kwargs={'upload_port': str(my_port)}, daemon=True)
         daemon.start()
+        if main_window:
+            main_window.evaluate_js(f"updateLoadingStatus('正在部署抓包环境...')")
+        time.sleep(4.5)
+        if main_window:
+            main_window.evaluate_js(f"updateLoadingStatus('抓包环境已就绪，请在小程序中点击登录...')")
         return jsonify({"status": "success", "message": "正在抓包"})
     return jsonify({"status": "error", "message": "用户名不能为空"}), 400
 
 def refreshClasses(student):
     global qdkblist, today_schedule, cur_student
     cur_student = student
-    sign = signUtils.getSignAndTimestamp()
-    signUtils.sm2_valid(sign[0], signUtils.privateKey, sign[1])
+    if student == "null" and studentInfo.get_users()[student] == "null":
+        ctypes.windll.user32.MessageBoxW(0, "请先添加用户！", "提示", 0)
+        return
+    # sign = signUtils.getSignAndTimestamp()
+    # signUtils.sm2_valid(sign[0], signUtils.privateKey, sign[1])
 
     qdkblist = payLoadsUtils.process_GetQdKbList(send_post("getQdKbList", payLoadsUtils.getStudentClassesPayload(student)))
     ##########没课时用抓包数据测试
     # with open(signUtils.resource_path("test.json"), "r", encoding="utf-8") as f:
     #     testjson = json.load(f)
-    # print(testjson)
+    # logging.debug(testjson)
     # qdkblist = payLoadsUtils.process_GetQdKbList(testjson)
     today_schedule = []
 
@@ -357,7 +398,7 @@ def refreshClasses(student):
         elif isSigned and isSignClose and isOnline:
             lec_info["status"] = "签到结束(已签线上)"
         today_schedule.append(lec_info)
-    print("today", today_schedule)
+    logging.debug("today" + str(today_schedule))
 
 def get_free_port():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -366,6 +407,15 @@ def get_free_port():
     s.close()
     return port
 
+def detect_first_run():
+    if not os.path.isfile(signUtils.resource_path("studentsInfo.json")):
+        brandnew_json = {
+            "users":{"null":"null"},
+            "infos":[]
+        }
+        with open(signUtils.resource_path("studentsInfo.json"), "w", encoding="utf-8") as f:
+            f.write(json.dumps(brandnew_json, ensure_ascii=False))
+
 def start_up(port):
     try:
         app.run(port=port, debug=False)
@@ -373,8 +423,8 @@ def start_up(port):
         clean_system_proxy()
 
 if __name__ == "__main__":
+    detect_first_run()
     my_port = get_free_port()
-    print(my_port)
     atexit.register(clean_system_proxy)
     threading.Thread(target=start_up,kwargs={'port': str(my_port)}, daemon=True).start()
     main_window = webview.create_window('海大课堂考勤Pro Max', f'http://127.0.0.1:{my_port}', width=1000, height=600)

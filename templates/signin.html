@@ -138,12 +138,25 @@
         <a href="/" class="back-link">← 返回课表主页</a>
     </form>
 </div>
-
+    <!-- 二次确认弹窗 -->
+    <div id="confirmModal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-icon">🤔</div>
+            <div class="modal-title">确认无码签到？</div>
+            <div class="modal-msg">系统将尝试自动破解签到码（0000-9999），该过程不可中断且耗时较长，是否继续？</div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="modal-btn" style="background: #eee; color: #666;" onclick="closeConfirmModal()">取 消</button>
+                <button class="modal-btn" onclick="startCracking()">确 认</button>
+            </div>
+        </div>
+    </div>
 <script>
     let isSuccess = false;
     // 页面进入淡入
     window.onload = function() {
         document.body.classList.add('page-visible');
+        document.getElementById('has_code').checked = true
+        toggleCodeInput()
     };
     document.addEventListener("DOMContentLoaded", function() {
         document.body.classList.add('page-visible');
@@ -174,24 +187,44 @@
 
     // 拦截表单提交
     document.getElementById('signinForm').addEventListener('submit', function(e) {
-        e.preventDefault(); // 阻止页面跳转刷新
+        e.preventDefault(); // 阻止默认跳转
 
-        if (!validateForm()) return; // 原有的本地校验
+        if (!validateForm()) return; // 执行本地格式校验
 
-        // 使用 AJAX提交数据
-        const formData = new FormData(this);
         const hasCode = document.getElementById('has_code').checked;
-        // 如果没有签到码，显示进度条弹窗
-        if (!hasCode) {
-            document.getElementById('progressModal').style.display = 'flex';
+
+        if (hasCode) {
+            executeSignin();
+        } else {
+            // 无签到码，弹出二次确认弹窗
+            document.getElementById('confirmModal').style.display = 'flex';
         }
-        fetch(this.action, {
+    });
+
+    // 关闭确认弹窗
+    function closeConfirmModal() {
+        document.getElementById('confirmModal').style.display = 'none';
+    }
+
+    // 用户在确认框点击“确认”后调用的函数
+    function startCracking() {
+        closeConfirmModal(); // 关闭确认框
+        document.getElementById('progressModal').style.display = 'flex'; // 显示进度条
+        executeSignin(); // 执行实际的签到请求
+    }
+
+    // 封装实际的请求逻辑
+    function executeSignin() {
+        const form = document.getElementById('signinForm');
+        const formData = new FormData(form);
+
+        fetch(form.action, {
             method: 'POST',
             body: formData
         })
         .then(response => response.json())
         .then(data => {
-            // 隐藏进度条
+            // 隐藏进度条（如果是爆破模式）
             document.getElementById('progressModal').style.display = 'none';
             showCustomModal(data.status, data.message);
         })
@@ -199,7 +232,7 @@
             document.getElementById('progressModal').style.display = 'none';
             showCustomModal('error', '任务异常中断');
         });
-    });
+    }
 
     function updateProgressBar(current, total, text) {
         const percent = (current / total) * 100;
