@@ -14,8 +14,7 @@ import os
 import logging
 import sys
 import signUtils
-from fuckuphnu import fuckHNU
-
+import fuckHNU
 
 class MitmDebugger:
     def __init__(self, script_path=signUtils.resource_path("mitmProxy.py"), proxy_port="8080", up_port="0"):

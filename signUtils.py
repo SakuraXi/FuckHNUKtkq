@@ -6,40 +6,31 @@
 # @Description: 国密SM2签名算法，通过js桥接来调用微信小程序库避免曲率和userID等差异导致签名校验不通过
 # @Version: 0.1
 
-import execjs
+import subprocess
+import sys
+
+if sys.platform.startswith('win'):
+    class SafePopen(subprocess.Popen):
+        def __init__(self, *args, **kwargs):
+            if 'creationflags' not in kwargs:
+                kwargs['creationflags'] = 0x08000000
+            super().__init__(*args, **kwargs)
+    subprocess.Popen = SafePopen
+
+def resource_path(relative_path):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
 import os
 import time
-import sys
 import logging
+import execjs
 
 privateKey = "00f661332f70969150a8ea126943958a914cc05abc7e3ad3d96570cc4fd01a9ce4"
 
 os.environ["EXECJS_RUNTIME"] = "Node"
 os.environ["NODE_PATH"] = os.path.join(os.getcwd(), "node_modules")
-
-
-# def get_node_runtime():
-#     # 判断是否是 PyInstaller 打包后的环境
-#     if hasattr(sys, '_MEIPASS'):
-#         # 打包后的路径
-#         node_modules_path = os.path.join(sys._MEIPASS, "node_modules")
-#         os.environ["NODE_PATH"] = node_modules_path
-#         node_path = os.path.join(sys._MEIPASS, "node", "node.exe")
-#     else:
-#
-#         # 开发环境下的路径
-#         node_path = os.path.join(os.path.abspath("."), "node", "node.exe")
-#     print(f"正在尝试加载 Node: {node_path}")  # 调试用
-#     print(f"该路径是否存在: {os.path.exists(node_path)}")
-#     if not os.path.exists(node_path):
-#         raise FileNotFoundError(f"找不到 Node 解释器: {node_path}")
-#
-#     # 强制 execjs 使用指定的 node 路径
-#     return execjs.ExternalRuntime(
-#         name='Node.js (Bundled)',
-#         command=[node_path],
-#         runner_source=execjs._runner_sources.Node
-#     )
 
 def init_node_env():
     if hasattr(sys, '_MEIPASS'):
@@ -50,11 +41,6 @@ def init_node_env():
     os.environ["PATH"] = node_dir + os.pathsep + os.environ["PATH"]
 
     return execjs.get("Node")
-
-def resource_path(relative_path):
-    if hasattr(sys, '_MEIPASS'):
-        return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.join(os.path.abspath("."), relative_path)
 
 def sm2_sign(msg_hex, priv_key_hex):
     init_node_env()

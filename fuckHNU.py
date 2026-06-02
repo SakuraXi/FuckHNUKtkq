@@ -6,7 +6,18 @@
 # @Description: FUCK the signing system of HNU and CRACK the sign-token.
 # @Version: 0.1
 
-import os
+import subprocess
+import sys
+
+# 1. 第一时间修补 subprocess，防止后续导入的模块触发错误
+if sys.platform.startswith('win'):
+    class SafePopen(subprocess.Popen):
+        def __init__(self, *args, **kwargs):
+            if 'creationflags' not in kwargs:
+                kwargs['creationflags'] = 0x08000000
+            super().__init__(*args, **kwargs)
+    subprocess.Popen = SafePopen
+
 import re
 import socket
 import threading
@@ -28,6 +39,7 @@ import winreg
 import ctypes
 import atexit
 import logging
+import os
 
 serverUrl = "https://ktkq.hainanu.edu.cn/app"
 
