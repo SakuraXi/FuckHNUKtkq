@@ -89,7 +89,7 @@ def clean_system_proxy():
 
 def add_new_user(user_name,user_data):
     try:
-        with open(signUtils.resource_path("studentsInfo.json"), "r", encoding="utf-8") as f:
+        with open(os.path.expandvars(r"%APPDATA%\FuckHNUktkq\studentsInfo.json"), "r", encoding="utf-8") as f:
             old_data = f.read()
         is_old = False
         new_json = json.loads(old_data)
@@ -106,7 +106,7 @@ def add_new_user(user_name,user_data):
         if is_old : return 2
         new_json["users"][user_name] = user_data["userCode"]
         new_json["infos"].append(user_data)
-        with open(signUtils.resource_path("studentsInfo.json"), "w", encoding="utf-8") as f:
+        with open(os.path.expandvars(r"%APPDATA%\FuckHNUktkq\studentsInfo.json"), "w", encoding="utf-8") as f:
             f.write(json.dumps(new_json, ensure_ascii=False))
         return 1
     except Exception as e:
@@ -420,12 +420,14 @@ def get_free_port():
     return port
 
 def detect_first_run():
-    if not os.path.isfile(signUtils.resource_path("studentsInfo.json")):
+    if not os.path.exists(os.path.expandvars(r"%APPDATA%\FuckHNUktkq")):
+        os.mkdir(os.path.expandvars(r"%APPDATA%\FuckHNUktkq"))
+    if not os.path.isfile(os.path.expandvars(r"%APPDATA%\FuckHNUktkq\studentsInfo.json")):
         brandnew_json = {
             "users":{"null":"null"},
             "infos":[]
         }
-        with open(signUtils.resource_path("studentsInfo.json"), "w", encoding="utf-8") as f:
+        with open(os.path.expandvars(r"%APPDATA%\FuckHNUktkq\studentsInfo.json"), "w", encoding="utf-8") as f:
             f.write(json.dumps(brandnew_json, ensure_ascii=False))
 
 def start_up(port):

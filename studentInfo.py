@@ -5,19 +5,20 @@
 # @Software: PyCharm
 # @Description: 
 # @Version: 1.0
+import os
 
 import signUtils
 import json
 import logging
 
 def get_infos():
-    with open(signUtils.resource_path("studentsInfo.json"), "r", encoding="utf-8") as f:
+    with open(os.path.expandvars(r"%APPDATA%\FuckHNUktkq\studentsInfo.json"), "r", encoding="utf-8") as f:
         raw = f.read()
     data = json.loads(raw)
     return data["infos"]
 
 def get_users():
-    with open(signUtils.resource_path("studentsInfo.json"), "r", encoding="utf-8") as f:
+    with open(os.path.expandvars(r"%APPDATA%\FuckHNUktkq\studentsInfo.json"), "r", encoding="utf-8") as f:
         raw = f.read()
     data = json.loads(raw)
     return data["users"]
