@@ -25,28 +25,15 @@ def resource_path(relative_path):
 import os
 import time
 import logging
-import execjs
+from py_mini_racer import MiniRacer
 
+ctx = MiniRacer()
 privateKey = "00f661332f70969150a8ea126943958a914cc05abc7e3ad3d96570cc4fd01a9ce4"
 
-os.environ["EXECJS_RUNTIME"] = "Node"
-os.environ["NODE_PATH"] = os.path.join(os.getcwd(), "node_modules")
-
-def init_node_env():
-    if hasattr(sys, '_MEIPASS'):
-        node_dir = os.path.join(sys._MEIPASS, "bin")
-    else:
-        node_dir = os.path.join(os.path.abspath("."), "bin")
-
-    os.environ["PATH"] = node_dir + os.pathsep + os.environ["PATH"]
-
-    return execjs.get("Node")
-
 def sm2_sign(msg_hex, priv_key_hex):
-    init_node_env()
-    with open(resource_path("sm2_bridge.js"), "r", encoding="utf-8") as f:
+    with open(resource_path("sm_bundle.js"), "r", encoding="utf-8") as f:
         js_code = f.read()
-    ctx = execjs.compile(js_code)
+    ctx.eval(js_code)
     try:
         signature = ctx.call("sign", msg_hex, priv_key_hex, {"hash": True,})
         return signature
@@ -55,10 +42,9 @@ def sm2_sign(msg_hex, priv_key_hex):
         return None
 
 def sm2_valid(signature, priv_key, testmsg):
-    init_node_env()
-    with open(resource_path("sm2_bridge.js"), "r", encoding="utf-8") as f:
+    with open(resource_path("sm_bundle.js"), "r", encoding="utf-8") as f:
         js_code = f.read()
-    ctx = execjs.compile(js_code)
+    ctx.eval(js_code)
     pub_key = ctx.call("getPublicKey", priv_key)
     test_msg = testmsg
     is_valid = ctx.call("verify", test_msg, signature, pub_key)

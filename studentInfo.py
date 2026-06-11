@@ -7,7 +7,6 @@
 # @Version: 1.0
 import os
 
-import signUtils
 import json
 import logging
 

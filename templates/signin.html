@@ -78,6 +78,11 @@
             padding: 14px; border-radius: 8px; font-size: 16px; cursor: pointer;
             font-weight: bold; transition: 0.3s; margin-top: 10px;
         }
+        .btn-submit:disabled {
+            background-color: #ccc !important;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
         .btn-submit:hover { background: #0056b3; }
         .back-link { display: block; text-align: center; margin-top: 20px; color: #888; text-decoration: none; font-size: 14px; }
         /* 进度条弹窗 */
@@ -115,9 +120,9 @@
         <div class="form-group">
             <label for="location">📍 确认当前上课地点：</label>
             <select name="location" id="location">
-                {% for loc in locations %}
-                <option value="{{ loc }}" {% if loc == recommend_loc %}selected{% endif %}>{{ loc }}</option>
-                {% endfor %}
+                % for loc in locations:
+                    <option value="{{ loc }}" {{ 'selected' if loc == recommend_loc else '' }}>{{ loc }}</option>
+                % end
             </select>
         </div>
 
@@ -134,7 +139,7 @@
             <div id="error_text" class="error-msg"></div>
         </div>
 
-        <button type="submit" class="btn-submit">立即提交签到</button>
+        <button type="submit" id="submitBtn" class="btn-submit">立即提交签到</button>
         <a href="/" class="back-link">← 返回课表主页</a>
     </form>
 </div>
@@ -190,7 +195,8 @@
         e.preventDefault(); // 阻止默认跳转
 
         if (!validateForm()) return; // 执行本地格式校验
-
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = true;
         const hasCode = document.getElementById('has_code').checked;
 
         if (hasCode) {
@@ -204,6 +210,7 @@
     // 关闭确认弹窗
     function closeConfirmModal() {
         document.getElementById('confirmModal').style.display = 'none';
+        document.getElementById('submitBtn').disabled = false;
     }
 
     // 用户在确认框点击“确认”后调用的函数
@@ -224,7 +231,6 @@
         })
         .then(response => response.json())
         .then(data => {
-            // 隐藏进度条（如果是爆破模式）
             document.getElementById('progressModal').style.display = 'none';
             showCustomModal(data.status, data.message);
         })
@@ -245,7 +251,7 @@
         const icon = document.getElementById('modalIcon');
         const title = document.getElementById('modalTitle');
         const msg = document.getElementById('modalMsg');
-
+        document.getElementById('submitBtn').disabled = false;
         // 记录状态
         isSuccess = (status === 'success');
 

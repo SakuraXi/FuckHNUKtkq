@@ -54,8 +54,12 @@ class MitmDebugger:
         env = os.environ.copy()
         env["FLASK_PORT"] = str(self.upload_port)
         # 使用 subprocess.Popen 异步启动
+        exe_path = signUtils.resource_path("mitmdump.exe")
+        if not os.path.exists(exe_path):
+            logging.error(f"致命错误：找不到 {exe_path}")
+            return
         self.process = subprocess.Popen(
-            ["mitmdump","-q", "-s", self.script_path, "-p", self.proxy_addr.split(":")[1]],
+            [exe_path,"-q", "-s", self.script_path, "-p", self.proxy_addr.split(":")[1]],
             stdout=sys.stdout,
             stderr=sys.stderr,
             env = env
@@ -70,7 +74,8 @@ class MitmDebugger:
             if self.start_mitmproxy():
                 # 修改系统代理
                 self.set_system_proxy(True)
-                file_path = signUtils.resource_path("mitmproxy-ca-cert.cer")
+                time.sleep(1)
+                file_path = os.path.expandvars("%USERPROFILE%/.mitmproxy/mitmproxy-ca-cert.cer")
                 if file_path:
                     command = f"certutil.exe -addstore root {file_path}"
                     os.system(command)
@@ -84,6 +89,7 @@ class MitmDebugger:
         except KeyboardInterrupt:
             logging.info("正在关闭服务...")
         finally:
+            logging.debug("6")
             self.is_running = False
             self.cleanup()
 

