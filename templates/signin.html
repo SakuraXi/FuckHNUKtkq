@@ -2,339 +2,207 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <title>课程签到 - {{ course.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>课程签到 - {{ course['name'] }}</title>
+    <script src="/static/sm_bundle.js"></script>
     <style>
         body {
             opacity: 0;
             transition: opacity 0.5s ease-in-out;
-            font-family: 'PingFang SC', sans-serif;
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
             background: #f0f2f5;
-            padding: 20px;
-        }
-        body.page-visible {
-            opacity: 1;
-        }
-        /* 自定义弹窗背景 */
-        .modal-overlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;
-        }
-        /* 弹窗主体 */
-        .modal-box {
-            background: white; padding: 30px; border-radius: 20px; width: 80%; max-width: 320px;
-            text-align: center; box-shadow: 0 15px 35px rgba(0,0,0,0.2); animation: popIn 0.3s ease-out;
-        }
-        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-
-        .modal-icon { font-size: 50px; margin-bottom: 15px; }
-        .modal-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #333; }
-        .modal-msg { color: #666; font-size: 14px; margin-bottom: 25px; line-height: 1.5; }
-
-        .modal-btn {
-            background: #007bff; color: white; border: none; padding: 10px 30px;
-            border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%;
-        }
-        /* 不同状态的颜色 */
-        .status-success { color: #52c41a; }
-        .status-error { color: #ff4d4f; }
-        .status-warning { color: #faad14; }
-
-        body { font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f0f2f5; padding: 20px; }
-        .signin-container { max-width: 450px; margin: 40px auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
-
-        h2 { text-align: center; color: #1a1a1a; margin-top: 0; }
-
-        /* 课程信息展示区域 */
-        .info-card {
-            background: #f8f9fa;
-            border-left: 5px solid #007bff;
             padding: 15px;
-            margin-bottom: 25px;
-            border-radius: 4px;
+            margin: 0;
         }
-        .info-card p { margin: 8px 0; color: #555; font-size: 15px; }
-        .info-card strong { color: #333; }
+        body.page-visible { opacity: 1; }
 
-        /* 表单样式 */
-        .form-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-weight: bold; color: #444; }
+        .signin-container {
+            width: 100%;
+            max-width: 450px;
+            margin: 20px auto;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            box-sizing: border-box;
+        }
+
+        h2 { text-align: center; color: #1a1a1a; margin-top: 0; font-size: 20px; }
+
+        .info-card { background: #f8f9fa; border-left: 5px solid #007bff; padding: 12px; margin-bottom: 20px; border-radius: 4px; }
+        .info-card p { margin: 6px 0; color: #555; font-size: 14px; }
+
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 6px; font-weight: bold; color: #444; font-size: 14px; }
+
+        /* 手机端输入优化 */
         select, input[type="text"] {
             width: 100%; padding: 12px; border: 1px solid #ddd;
-            border-radius: 8px; box-sizing: border-box; font-size: 14px;
+            border-radius: 8px; box-sizing: border-box;
+            font-size: 16px !important; /* 核心：防止iOS点击缩放 */
         }
 
         #code_input_wrapper { display: none; margin-top: 15px; background: #fffbe6; padding: 10px; border-radius: 8px; border: 1px dashed #ffe58f; }
 
-        /* 错误提示文字样式 */
-        .error-msg {
-            color: #ff4d4f;
-            font-size: 13px;
-            margin-top: 8px;
-            display: none; /* 默认隐藏 */
-        }
-
         .btn-submit {
             width: 100%; background: #007bff; color: white; border: none;
             padding: 14px; border-radius: 8px; font-size: 16px; cursor: pointer;
-            font-weight: bold; transition: 0.3s; margin-top: 10px;
+            font-weight: bold; transition: 0.3s;
         }
-        .btn-submit:disabled {
-            background-color: #ccc !important;
-            cursor: not-allowed;
-            box-shadow: none;
-        }
-        .btn-submit:hover { background: #0056b3; }
-        .back-link { display: block; text-align: center; margin-top: 20px; color: #888; text-decoration: none; font-size: 14px; }
-        /* 进度条弹窗 */
-        .progress-overlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center;
-        }
-        .progress-box {
-            background: white; padding: 25px; border-radius: 15px; width: 300px; text-align: center;
-        }
-        .progress-bar-container {
-            width: 100%; height: 20px; background: #eee; border-radius: 10px; margin: 15px 0; overflow: hidden;
-        }
-        .progress-bar-fill {
-            width: 0%; height: 100%; background: #007bff; transition: width 0.1s;
-        }
-        #progress-text { font-size: 14px; color: #666; }
+        .btn-submit:disabled { background-color: #ccc !important; }
+        .btn-submit:active { transform: scale(0.98); opacity: 0.9; }
+
+        .back-link { display: block; text-align: center; margin-top: 20px; color: #888; text-decoration: none; font-size: 14px; padding: 10px; }
+
+        /* 弹窗适配 */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-box { background: white; padding: 25px; border-radius: 20px; width: 85%; max-width: 320px; text-align: center; box-sizing: border-box; }
+        .modal-icon { font-size: 40px; margin-bottom: 10px; }
+        .modal-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+        .modal-msg { color: #666; font-size: 14px; margin-bottom: 20px; line-height: 1.5; }
+        .modal-btn { background: #007bff; color: white; border: none; padding: 10px; border-radius: 8px; width: 100%; font-weight: bold; }
+
+        /* 进度条适配 */
+        .progress-box { background: white; padding: 20px; border-radius: 15px; width: 85%; max-width: 300px; text-align: center; }
+        .progress-bar-container { width: 100%; height: 12px; background: #eee; border-radius: 6px; margin: 15px 0; overflow: hidden; }
+        .progress-bar-fill { width: 0%; height: 100%; background: #007bff; transition: width 0.1s; }
+        #progress-text { font-size: 13px; color: #666; }
     </style>
 </head>
 <body>
 
 <div class="signin-container">
-    <h2>课程签到确认</h2>
-
+    <h2>签到确认</h2>
     <div class="info-card">
-        <p><strong>课程名称：</strong>{{ course.name }}</p>
-        <p><strong>上课教师：</strong>{{ course.teacher }}</p>
-        <p><strong>上课时间：</strong>{{ course.time }} ({{ course.period }})</p>
-        <p><strong>课表地点：</strong>{{ course.location }}</p>
+        <p><strong>课程：</strong>{{ course['name'] }}</p>
+        <p><strong>时间：</strong>{{ course['time'] }}</p>
+        <p><strong>地点：</strong>{{ course['location'] }}</p>
     </div>
 
-    <form id="signinForm" action="{{ url_for('do_signin', course_id=course.id) }}" method="POST" onsubmit="return validateForm()">
-
-        <!-- 地点确认选择 -->
+    <form id="signinForm" action="/do_signin/{{ course['id'] }}" method="POST">
         <div class="form-group">
-            <label for="location">📍 确认当前上课地点：</label>
+            <label for="location">📍 确认当前地点：</label>
             <select name="location" id="location">
                 % for loc in locations:
                     <option value="{{ loc }}" {{ 'selected' if loc == recommend_loc else '' }}>{{ loc }}</option>
                 % end
             </select>
         </div>
-
-        <!-- 签到码选项 -->
         <div class="form-group">
             <input type="checkbox" id="has_code" name="has_code" onchange="toggleCodeInput()">
-            <label style="display: inline; cursor: pointer;" for="has_code">我有签到码</label>
+            <label style="display: inline; cursor: pointer;" for="has_code"> 我有签到码</label>
         </div>
 
-        <!-- 签到码输入框容器 -->
         <div id="code_input_wrapper">
             <label for="signin_code">签到码：</label>
-            <input type="text" name="signin_code" id="signin_code" maxlength="4" placeholder="请输入4位数字签到码">
+            <input type="text" name="signin_code" id="signin_code" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="请输入4位数字签到码">
             <div id="error_text" class="error-msg"></div>
         </div>
-
-        <button type="submit" id="submitBtn" class="btn-submit">立即提交签到</button>
-        <a href="/" class="back-link">← 返回课表主页</a>
+        <button type="submit" id="submitBtn" class="btn-submit">立即签到</button>
+        <a href="/" class="back-link">← 返回主页</a>
     </form>
 </div>
-    <!-- 二次确认弹窗 -->
-    <div id="confirmModal" class="modal-overlay">
-        <div class="modal-box">
-            <div class="modal-icon">🤔</div>
-            <div class="modal-title">确认无码签到？</div>
-            <div class="modal-msg">系统将尝试自动破解签到码（0000-9999），该过程不可中断且耗时较长，是否继续？</div>
-            <div style="display: flex; gap: 10px; margin-top: 20px;">
-                <button class="modal-btn" style="background: #eee; color: #666;" onclick="closeConfirmModal()">取 消</button>
-                <button class="modal-btn" onclick="startCracking()">确 认</button>
-            </div>
+
+<div id="confirmModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-icon">🤔</div>
+        <div class="modal-title">确认爆破？</div>
+        <div class="modal-msg">自动尝试 0000-9999，耗时较长。是否继续？</div>
+        <div style="display: flex; gap: 10px;">
+            <button class="modal-btn" style="background:#eee; color:#666;" onclick="closeConfirmModal()">取消</button>
+            <button class="modal-btn" onclick="startCracking()">确认</button>
         </div>
     </div>
+</div>
+
+<div id="customModal" class="modal-overlay">
+    <div class="modal-box">
+        <div id="modalIcon" class="modal-icon"></div>
+        <div id="modalTitle" class="modal-title"></div>
+        <div id="modalMsg" class="modal-msg"></div>
+        <button class="modal-btn" onclick="closeModal()">确 定</button>
+    </div>
+</div>
+
+<div id="progressModal" class="modal-overlay">
+    <div class="progress-box">
+        <h3 style="margin:0; font-size:16px;">爆破中...</h3>
+        <div class="progress-bar-container"><div id="progressBar" class="progress-bar-fill"></div></div>
+        <div id="progress-text">已发送: 0 / 10000</div>
+    </div>
+</div>
+
 <script>
     let isSuccess = false;
-    // 页面进入淡入
-    window.onload = function() {
+    window.onload = () => {
         document.body.classList.add('page-visible');
-        document.getElementById('has_code').checked = true
-        toggleCodeInput()
+        document.getElementById('has_code').checked = true;
+        toggleCodeInput();
     };
-    document.addEventListener("DOMContentLoaded", function() {
-        document.body.classList.add('page-visible');
 
-        // 拦截“返回课表主页”链接
-        document.querySelector('.back-link').addEventListener('click', function(e) {
-            e.preventDefault();
-            const targetUrl = this.href;
-            document.body.classList.remove('page-visible');
-            setTimeout(() => { window.location.href = targetUrl; }, 400);
-        });
-    });
     function toggleCodeInput() {
-        var checkbox = document.getElementById('has_code');
-        var wrapper = document.getElementById('code_input_wrapper');
-        var input = document.getElementById('signin_code');
-        var errorDiv = document.getElementById('error_text');
+        const cb = document.getElementById('has_code');
+        document.getElementById('code_input_wrapper').style.display = cb.checked ? 'block' : 'none';
+        if(cb.checked) document.getElementById('signin_code').focus();
 
-        if (checkbox.checked) {
-            wrapper.style.display = 'block';
-            input.focus();
-        } else {
-            wrapper.style.display = 'none';
-            // 隐藏时清空错误信息
-            errorDiv.style.display = 'none';
-        }
+
+
+
+
+
+
+
+
     }
 
-    // 拦截表单提交
-    document.getElementById('signinForm').addEventListener('submit', function(e) {
-        e.preventDefault(); // 阻止默认跳转
 
-        if (!validateForm()) return; // 执行本地格式校验
-        const submitBtn = document.getElementById('submitBtn');
-        submitBtn.disabled = true;
-        const hasCode = document.getElementById('has_code').checked;
-
-        if (hasCode) {
+    document.getElementById('signinForm').onsubmit = function(e) {
+        e.preventDefault();
+        const code = document.getElementById('signin_code').value.trim();
+        if(document.getElementById('has_code').checked) {
+            if(!/^\d{4}$/.test(code)) { alert("请输入4位数字"); return; }
             executeSignin();
         } else {
-            // 无签到码，弹出二次确认弹窗
             document.getElementById('confirmModal').style.display = 'flex';
         }
-    });
+    };
 
-    // 关闭确认弹窗
-    function closeConfirmModal() {
-        document.getElementById('confirmModal').style.display = 'none';
-        document.getElementById('submitBtn').disabled = false;
-    }
+    function closeConfirmModal() { document.getElementById('confirmModal').style.display = 'none'; }
+    function startCracking() { closeConfirmModal(); document.getElementById('progressModal').style.display = 'flex'; executeSignin(); }
 
-    // 用户在确认框点击“确认”后调用的函数
-    function startCracking() {
-        closeConfirmModal(); // 关闭确认框
-        document.getElementById('progressModal').style.display = 'flex'; // 显示进度条
-        executeSignin(); // 执行实际的签到请求
-    }
-
-    // 封装实际的请求逻辑
     function executeSignin() {
-        const form = document.getElementById('signinForm');
-        const formData = new FormData(form);
-
-        fetch(form.action, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('progressModal').style.display = 'none';
-            showCustomModal(data.status, data.message);
-        })
-        .catch(error => {
-            document.getElementById('progressModal').style.display = 'none';
-            showCustomModal('error', '任务异常中断');
-        });
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        fetch(document.getElementById('signinForm').action, { method: 'POST', body: new FormData(document.getElementById('signinForm')) })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('progressModal').style.display = 'none';
+                showCustomModal(data.status, data.message);
+            });
     }
 
-    function updateProgressBar(current, total, text) {
-        const percent = (current / total) * 100;
-        document.getElementById('progressBar').style.width = percent + '%';
-        document.getElementById('progress-text').innerText = text;
+    function updateProgressBar(curr, tot, txt) {
+        document.getElementById('progressBar').style.width = (curr/tot*100) + '%';
+        document.getElementById('progress-text').innerText = txt;
     }
 
-    function showCustomModal(status, message) {
-        const modal = document.getElementById('customModal');
-        const icon = document.getElementById('modalIcon');
-        const title = document.getElementById('modalTitle');
-        const msg = document.getElementById('modalMsg');
+    function showCustomModal(s, m) {
+        isSuccess = (s === 'success');
+        document.getElementById('modalIcon').innerText = s==='success'?'✅':'❌';
+        document.getElementById('modalTitle').innerText = s==='success'?'签到成功':'签到失败';
+        document.getElementById('modalMsg').innerText = m;
         document.getElementById('submitBtn').disabled = false;
-        // 记录状态
-        isSuccess = (status === 'success');
-
-        if (status === 'success') {
-            icon.innerText = '✅';
-            title.innerText = '签到成功';
-            title.className = 'modal-title status-success';
-        } else if (status === 'error') {
-            icon.innerText = '❌';
-            title.innerText = '签到失败';
-            title.className = 'modal-title status-error';
-        } else {
-            icon.innerText = '⚠️';
-            title.innerText = '提示';
-            title.className = 'modal-title status-warning';
-        }
-
-        msg.innerText = message;
-        modal.style.display = 'flex';
+        document.getElementById('customModal').style.display = 'flex';
     }
 
     function closeModal() {
-        if (isSuccess) {
-            // 如果签到成功，先渐出再跳转
+        if(isSuccess) {
             document.body.classList.remove('page-visible');
-            setTimeout(() => {
-                window.location.href = "{{ url_for('index') }}";
-            }, 400);
+            setTimeout(() => location.href = "/", 400);
         } else {
-            // 如果是错误提示，仅关闭弹窗，不涉及页面跳转，无需渐出
             document.getElementById('customModal').style.display = 'none';
         }
     }
-
-    // 表单校验
-    function validateForm() {
-        var hasCode = document.getElementById('has_code').checked;
-        var codeInput = document.getElementById('signin_code').value.trim();
-        var errorDiv = document.getElementById('error_text');
-
-        // 只有在勾选了“我有签到码”时才进行判断
-        if (hasCode) {
-            // 判断是否为空
-            if (codeInput === "") {
-                showError("❌ 请输入签到码");
-                return false;
-            }
-
-            // 判断是否为4位数字
-            var reg = /^\d{4}$/;
-            if (!reg.test(codeInput)) {
-                showError("❌ 签到码格式错误：请输入4位纯数字");
-                return false;
-            }
-        }
-
-        return true; // 验证通过，允许提交
-    }
-
-    function showError(msg) {
-        var errorDiv = document.getElementById('error_text');
-        errorDiv.innerText = msg;
-        errorDiv.style.display = 'block';
-    }
 </script>
-    <!-- 自定义弹窗 HTML -->
-    <div id="customModal" class="modal-overlay">
-        <div class="modal-box">
-            <div id="modalIcon" class="modal-icon"></div>
-            <div id="modalTitle" class="modal-title"></div>
-            <div id="modalMsg" class="modal-msg"></div>
-            <button class="modal-btn" onclick="closeModal()">确 定</button>
-        </div>
-    </div>
-    <div id="progressModal" class="progress-overlay">
-        <div class="progress-box">
-            <h3 style="margin-top:0">正在爆破签到码...</h3>
-            <div class="progress-bar-container">
-                <div id="progressBar" class="progress-bar-fill"></div>
-            </div>
-            <div id="progress-text">已发送: 0 / 10000</div>
-            <p style="font-size: 12px; color: #999; margin-top: 10px;">请勿关闭窗口，等待任务完成</p>
-        </div>
-    </div>
 </body>
 </html>

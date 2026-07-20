@@ -40,7 +40,7 @@ import atexit
 import logging
 import os
 
-from bottle import Bottle, request, response, template, static_file, post, get, run, TEMPLATE_PATH
+from bottle import Bottle, request, response, template, TEMPLATE_PATH
 
 serverUrl = "https://ktkq.hainanu.edu.cn/app"
 
@@ -66,6 +66,7 @@ did_adding_users = False
 app = Bottle()
 base_dir = os.path.dirname(os.path.abspath(__file__))
 templates_dir = os.path.join(base_dir, 'templates')
+
 if templates_dir not in TEMPLATE_PATH:
     TEMPLATE_PATH.insert(0, templates_dir)
 def render_tpl(name, **kwargs):
@@ -259,7 +260,6 @@ async def signWithoutCode(student, classId, location):
 def index():
     users = studentInfo.get_users().keys()
     refreshClasses(request.query.user if request.query.user else list(users)[0])
-
     now = datetime.now()
     date_str = now.strftime("%Y年%m月%d日")
     time_str = now.strftime("%H:%M:%S")
@@ -284,9 +284,9 @@ def signin_page(course_id):
 
 @app.post('/do_signin/<course_id:int>')
 def do_signin(course_id):
-    selected_location = request.form.get('location')
-    has_code = request.form.get('has_code')
-    signin_code = request.form.get('signin_code')
+    selected_location = request.forms.get('location')
+    has_code = request.forms.get('has_code')
+    signin_code = request.forms.get('signin_code')
 
     if has_code:
         if not signin_code or not re.match(r'^\d{4}$', signin_code):
@@ -318,8 +318,46 @@ def do_signin(course_id):
             break
     return {"status": "success", "message": "签到成功！"}
 
+def on_capture(data: bytes):
+    """
+    代理抓包回调: 当 mitmproxy 拦截到目标响应时直接调用。
+    替代旧版 /upload HTTP 端点的逻辑，无需 HTTP 转发。
+
+    Args:
+        data: HTTP 响应体的原始字节 (JSON 格式)
+    """
+    global new_user, did_adding_users
+    if main_window:
+        main_window.evaluate_js("updateLoadingStatus('抓包成功，正在保存用户信息...')")
+    try:
+        json_data = json.loads(data)
+        processed = payLoadsUtils.process_GetUserOpenId(json_data)
+        logging.debug(f"收到新用户数据: {processed}")
+        stat = 0
+        if new_user:
+            stat = add_new_user(new_user, processed)
+        if stat == 1:
+            if main_window:
+                main_window.evaluate_js(f"showResult('success', '添加成功', '用户 {new_user} 已成功导入！')")
+        elif stat == 2:
+            if main_window:
+                existing = studentInfo.getStudentInfoByCode(processed["userCode"])
+                existing_name = existing["userName"] if existing else "未知"
+                main_window.evaluate_js(f"showResult('warning', '添加失败', '用户 {existing_name} 已存在！')")
+        else:
+            if main_window:
+                main_window.evaluate_js("showResult('error', '添加失败', '保存文件时发生错误')")
+    except Exception as e:
+        logging.error(f"处理抓包数据失败: {e}")
+        if main_window:
+            main_window.evaluate_js("showResult('error', '添加失败', '处理数据时发生错误')")
+    finally:
+        did_adding_users = False
+
+
 @app.post('/upload')
 def receive_data():
+    """保留旧端点用于兼容 (新流程通过 on_capture 回调直接处理)"""
     global new_user
     if main_window:
         main_window.evaluate_js("updateLoadingStatus('抓包成功，正在保存用户信息...')")
@@ -350,7 +388,7 @@ def add_user():
     if new:
         logging.info(f"收到新增用户请求: {new}")
         new_user = new
-        daemon = threading.Thread(target=getStuInfo.runProxy,kwargs={'upload_port': str(my_port)}, daemon=True)
+        daemon = threading.Thread(target=getStuInfo.runProxy, kwargs={'callback': on_capture}, daemon=True)
         daemon.start()
         if main_window:
             main_window.evaluate_js(f"updateLoadingStatus('正在部署抓包环境...')")
@@ -366,6 +404,7 @@ def refreshClasses(student):
     if student == "null" and studentInfo.get_users()[student] == "null":
         ctypes.windll.user32.MessageBoxW(0, "请先添加用户！", "提示", 0)
         return
+
     qdkblist = payLoadsUtils.process_GetQdKbList(send_post("getQdKbList", payLoadsUtils.getStudentClassesPayload(student)))
     today_schedule = []
 
@@ -434,7 +473,6 @@ def detect_first_run():
         }
         with open(os.path.expandvars(r"%APPDATA%\FuckHNUktkq\studentsInfo.json"), "w", encoding="utf-8") as f:
             f.write(json.dumps(brandnew_json, ensure_ascii=False))
-
 def start_up(port):
     try:
         app.run(port=port, debug=False)
