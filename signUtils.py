@@ -3,7 +3,7 @@
 # @Author  : xlxlSakura
 # @FileName: signUtils.py
 # @Software: PyCharm
-# @Description: 国密SM2签名算法，通过js桥接来调用微信小程序库避免曲率和userID等差异导致签名校验不通过
+# @Description: 国密SM2签名算法
 # @Version: 0.1
 
 import sys
